@@ -271,6 +271,16 @@ io.on('connection', (socket) => {
         const room = rooms.get(roomId);
         if (room && room.adminSocket === socket.id) {
             room.players = presetType === 'cricket' ? [...CRICKET_PLAYERS] : [...DEFAULT_PLAYERS];
+
+            // Auto-resume if it was finished and players were added
+            if (room.status === 'finished' && room.players.length > room.currentPlayerIndex) {
+                room.status = 'active';
+                const currentPlayer = room.players[room.currentPlayerIndex];
+                room.currentBid = { amount: currentPlayer ? currentPlayer.basePrice : 0, bidder: null };
+                room.timeLeft = AUCTION_TIMER_SECONDS;
+                addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION RESUMED WITH NEW ROSTER' });
+            }
+
             io.to(roomId).emit('room-update', room);
         }
     });
@@ -284,6 +294,16 @@ io.on('connection', (socket) => {
             player.stats = player.stats || [{ label: "VAL", value: player.ovr }];
             player.badges = player.badges || ["Manual Entry"];
             room.players.push(player);
+
+            // Auto-resume if it was finished and players were added
+            if (room.status === 'finished' && room.players.length > room.currentPlayerIndex) {
+                room.status = 'active';
+                const currentPlayer = room.players[room.currentPlayerIndex];
+                room.currentBid = { amount: currentPlayer ? currentPlayer.basePrice : 0, bidder: null };
+                room.timeLeft = AUCTION_TIMER_SECONDS;
+                addActivity(roomId, { type: 'SYSTEM', message: `AUCTION RESUMED: ${player.name.toUpperCase()} ADDED` });
+            }
+
             io.to(roomId).emit('room-update', room);
         }
     });
@@ -304,8 +324,19 @@ io.on('connection', (socket) => {
     socket.on('update-players', ({ roomId, players }) => {
         const room = rooms.get(roomId);
         if (room && room.adminSocket === socket.id) {
+            const oldCount = room.players.length;
             room.players = players;
             console.log(`Server: Updated player list for room ${roomId}, count: ${players.length}`);
+
+            // Auto-resume if it was finished and players were added
+            if (room.status === 'finished' && room.players.length > room.currentPlayerIndex) {
+                room.status = 'active';
+                const currentPlayer = room.players[room.currentPlayerIndex];
+                room.currentBid = { amount: currentPlayer ? currentPlayer.basePrice : 0, bidder: null };
+                room.timeLeft = AUCTION_TIMER_SECONDS;
+                addActivity(roomId, { type: 'SYSTEM', message: `AUCTION RESUMED: ${players.length - oldCount} NEW PLAYERS INJECTED` });
+            }
+
             io.to(roomId).emit('room-update', { ...room });
         }
     });
@@ -356,6 +387,10 @@ io.on('connection', (socket) => {
         if (room) {
             if (room.adminSocket === socket.id) {
                 room.status = 'active';
+                // If timer was at 0, reset it to give time for bids
+                if (room.timeLeft <= 0) {
+                    room.timeLeft = AUCTION_TIMER_SECONDS;
+                }
                 console.log(`Server: Room ${roomId} status set to ACTIVE`);
                 addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION RESUMED BY ADMIN' });
                 io.to(roomId).emit('room-update', room);

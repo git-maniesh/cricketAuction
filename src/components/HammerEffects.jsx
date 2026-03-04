@@ -70,7 +70,7 @@ const HammerEffects = ({ show, onComplete, type = 'SOLD' }) => {
         >
             <div className="relative group">
                 {/* Glow effect */}
-                <div className="absolute inset-0 bg-primary/40 rounded-full blur-[120px] animate-pulse" />
+                <div className="absolute inset-0 bg-primary/40 rounded-full blur-[20px] animate-pulse" />
 
                 <div ref={hammerRef} className="relative z-10 flex flex-col items-center">
                     <div className="w-48 h-48 bg-surface-dark border-4 border-primary rounded-[48px] flex items-center justify-center shadow-[0_0_80px_rgba(234,42,51,0.4)]">

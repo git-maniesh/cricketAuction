@@ -840,7 +840,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                         <AnimatePresence mode="popLayout">
                             {sidebarTab === 'activity' ? (
                                 <div className="space-y-4">
-                                    {(roomState?.activity || []).slice().reverse().map((entry, i) => (
+                                    {(roomState?.activity || []).map((entry, i) => (
                                         <motion.div
                                             initial={{ opacity: 0, x: 20 }}
                                             animate={{ opacity: 1, x: 0 }}
