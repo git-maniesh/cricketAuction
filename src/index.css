@@ -15,10 +15,23 @@
 }
 
 @layer base {
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background-dark text-white font-display antialiased;
     position: relative;
     min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   body::before {
@@ -37,6 +50,7 @@
     filter: saturate(0.8) contrast(1.1);
   }
 }
+
 
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

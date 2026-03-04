@@ -73,14 +73,14 @@ const HammerEffects = ({ show, onComplete, type = 'SOLD' }) => {
                 <div className="absolute inset-0 bg-primary/40 rounded-full blur-[20px] animate-pulse" />
 
                 <div ref={hammerRef} className="relative z-10 flex flex-col items-center">
-                    <div className="w-48 h-48 bg-surface-dark border-4 border-primary rounded-[48px] flex items-center justify-center shadow-[0_0_80px_rgba(234,42,51,0.4)]">
-                        <Gavel className="w-24 h-24 text-primary" />
+                    <div className="w-32 h-32 sm:w-48 sm:h-48 bg-surface-dark border-4 border-primary rounded-[32px] sm:rounded-[48px] flex items-center justify-center shadow-[0_0_80px_rgba(234,42,51,0.4)]">
+                        <Gavel className="w-16 h-16 sm:w-24 sm:h-24 text-primary" />
                     </div>
                     <div className="mt-8 text-center">
-                        <h1 className="text-7xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_30px_rgba(234,42,51,0.8)]">
+                        <h1 className="text-4xl sm:text-7xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_30px_rgba(234,42,51,0.8)] text-center px-4">
                             {type === 'SOLD' ? 'SOLD!' : type === 'UNSOLD' ? 'UNSOLD' : type === 'CLOSING' ? 'FINAL CALL' : 'AUCTION OPEN'}
                         </h1>
-                        <p className="text-primary font-black uppercase tracking-[0.5em] mt-2 animate-bounce">
+                        <p className="text-primary font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] mt-2 animate-bounce text-[10px] sm:text-sm text-center px-2">
                             {type === 'SOLD' ? 'New Legend Acquired' : type === 'UNSOLD' ? 'Moving to Next Asset' : type === 'CLOSING' ? 'Hammer About to Fall!' : 'Let the Bidding Begin'}
                         </p>
                     </div>

@@ -40,9 +40,10 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
     const [showHammer, setShowHammer] = useState(false);
     const [hammerType, setHammerType] = useState('SOLD');
     const [unreadMessages, setUnreadMessages] = useState(0);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const fileInputRef = React.useRef(null);
     const sidebarEndRef = React.useRef(null);
-    const lastClosingTriggered = React.useRef(null); // Track last triggered player + time mark
+    const lastClosingTriggered = React.useRef(null);
 
     const formatPrice = (amount) => {
         if (amount >= 1) return `₹${amount.toFixed(2)} Cr`;
@@ -339,59 +340,94 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
             </AnimatePresence>
 
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/40 backdrop-blur-2xl relative z-20">
-                <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3 text-primary">
-                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
-                            <Gavel className="w-6 h-6" />
+            <header className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-black/40 backdrop-blur-2xl relative z-20">
+                <div className="flex items-center gap-2 sm:gap-6">
+                    <div className="flex items-center gap-2 sm:gap-3 text-primary">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+                            <Gavel className="w-4 h-4 sm:w-6 sm:h-6" />
                         </div>
-                        <h2 className="text-2xl font-black italic tracking-tighter uppercase">Elite <span className="text-primary italic">Auction</span></h2>
+                        <h2 className="hidden sm:block text-xl sm:text-2xl font-black italic tracking-tighter uppercase">Elite <span className="text-primary italic">Auction</span></h2>
                     </div>
 
-                    <div className="flex items-center gap-4 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl group relative">
+                    <div className="flex items-center gap-2 sm:gap-4 bg-white/5 border border-white/10 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl">
                         <div className="flex flex-col">
-                            <span className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">Room ID</span>
-                            <span className="font-bold text-sm text-primary tracking-widest">{roomId}</span>
+                            <span className="text-[7px] sm:text-[8px] font-black opacity-30 uppercase tracking-[0.2em]">Room</span>
+                            <span className="font-bold text-xs sm:text-sm text-primary tracking-widest">{roomId}</span>
                         </div>
                         <button
                             onClick={copyRoomId}
-                            className="p-2 hover:bg-primary/20 rounded-lg transition-all border border-white/5 hover:border-primary/40 group/copy"
+                            className="p-1.5 sm:p-2 hover:bg-primary/20 rounded-lg transition-all border border-white/5"
                             title="Copy Room ID"
                         >
                             {showCopied ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
                             ) : (
-                                <Copy className="w-4 h-4 opacity-40 group-hover/copy:opacity-100" />
+                                <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-40" />
                             )}
                         </button>
                     </div>
 
-                    <div className="hidden md:flex items-center gap-4 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl">
-                        <Coins className="w-4 h-4 text-primary" />
-                        <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">Budget</span>
-                        <span className="font-bold text-sm">{formatPrice(userBudget)}</span>
+                    <div className="hidden md:flex items-center gap-2 sm:gap-4 bg-white/5 border border-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl">
+                        <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+                        <span className="text-[9px] sm:text-[10px] font-black opacity-40 uppercase tracking-widest">Budget</span>
+                        <span className="font-bold text-xs sm:text-sm">{formatPrice(userBudget)}</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <nav className="hidden lg:flex items-center gap-8">
+                <div className="flex items-center gap-2 sm:gap-6">
+                    <nav className="hidden lg:flex items-center gap-6">
                         {['Dashboard', 'Marketplace', 'Players', 'Squad', 'Rules', ...(isAdmin ? ['Manage'] : [])].map(item => (
                             <button
                                 key={item}
                                 onClick={() => setActiveTab(item.toLowerCase())}
-                                className={`text-sm font-bold transition-all uppercase tracking-widest ${activeTab === item.toLowerCase() ? 'text-primary opacity-100' : 'opacity-40 hover:opacity-100'}`}
+                                className={`text-xs sm:text-sm font-bold transition-all uppercase tracking-widest ${activeTab === item.toLowerCase() ? 'text-primary opacity-100' : 'opacity-40 hover:opacity-100'}`}
                             >
                                 {item}
                             </button>
                         ))}
                     </nav>
-                    <div className="flex gap-2">
-                        <button className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary/10 transition-colors">
-                            <Bell className="w-5 h-5 opacity-40" />
-                        </button>
+                    {/* Mobile Budget badge */}
+                    <div className="flex md:hidden items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl">
+                        <Coins className="w-3 h-3 text-primary" />
+                        <span className="font-bold text-[10px]">{formatPrice(userBudget)}</span>
                     </div>
+                    <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-primary/10 transition-colors">
+                        <Bell className="w-4 h-4 sm:w-5 sm:h-5 opacity-40" />
+                    </button>
                 </div>
             </header>
+
+            {/* Mobile Bottom Tab Nav */}
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-1 py-2">
+                {['Marketplace', 'Dashboard', 'Squad', 'Activity', 'Chat', ...(isAdmin ? ['Manage'] : [])].map(item => (
+                    <button
+                        key={item}
+                        onClick={() => {
+                            setActiveTab(item.toLowerCase());
+                            if (item === 'Chat') setUnreadMessages(0);
+                        }}
+                        className={`flex flex-col items-center gap-0.5 px-1 py-1 rounded-xl transition-all relative ${activeTab === item.toLowerCase() ? 'text-primary' : 'text-white/30'}`}
+                    >
+                        {item === 'Marketplace' && <Gavel className="w-4 h-4" />}
+                        {item === 'Dashboard' && <TrendingUp className="w-4 h-4" />}
+                        {item === 'Squad' && <Users className="w-4 h-4" />}
+                        {item === 'Activity' && <Activity className="w-4 h-4" />}
+                        {item === 'Chat' && (
+                            <span className="relative">
+                                <MessageSquare className="w-4 h-4" />
+                                {unreadMessages > 0 && item !== 'Chat' && (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white text-[6px] font-black rounded-full flex items-center justify-center">{unreadMessages}</span>
+                                )}
+                            </span>
+                        )}
+                        {item === 'Manage' && <Settings className="w-4 h-4" />}
+                        <span className="text-[7px] font-black uppercase tracking-wider">{item}</span>
+                        {item === 'Chat' && unreadMessages > 0 && activeTab !== 'chat' && (
+                            <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 text-white text-[6px] font-black rounded-full flex items-center justify-center border border-black">{unreadMessages}</span>
+                        )}
+                    </button>
+                ))}
+            </nav>
 
             <main className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar - Leaderboard */}
@@ -426,38 +462,38 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col min-w-0 bg-transparent">
                     {/* Content Section */}
-                    <section className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                    <section className="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
                         <div className="max-w-5xl mx-auto">
                             {/* Admin Controls Overlay */}
                             {isAdmin && (
-                                <div className="flex items-center justify-between mb-8 bg-white/5 border border-white/10 p-4 rounded-[32px] backdrop-blur-xl">
-                                    <div className="flex items-center gap-3 px-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 sm:mb-8 bg-white/5 border border-white/10 p-3 sm:p-4 rounded-[24px] sm:rounded-[32px] backdrop-blur-xl">
+                                    <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4">
                                         <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40 text-primary">Admin Console</span>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {roomState?.status === 'active' ? (
-                                            <button onClick={() => handleAdminAction('pause-auction')} className="p-3 bg-yellow-500/20 text-yellow-400 rounded-2xl hover:bg-yellow-500/30 transition-all border border-yellow-500/20 flex items-center gap-2 px-6">
-                                                <Pause className="w-4 h-4" /> <span className="text-[10px] font-black uppercase tracking-widest">Pause</span>
+                                            <button onClick={() => handleAdminAction('pause-auction')} className="p-2 sm:p-3 bg-yellow-500/20 text-yellow-400 rounded-xl sm:rounded-2xl hover:bg-yellow-500/30 transition-all border border-yellow-500/20 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6">
+                                                <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Pause</span>
                                             </button>
                                         ) : (
-                                            <button onClick={() => handleAdminAction('resume-auction')} className="p-3 bg-green-500/20 text-green-400 rounded-2xl hover:bg-green-500/30 transition-all border border-green-500/20 flex items-center gap-2 px-6">
-                                                <Play className="w-4 h-4" /> <span className="text-[10px] font-black uppercase tracking-widest">Resume</span>
+                                            <button onClick={() => handleAdminAction('resume-auction')} className="p-2 sm:p-3 bg-green-500/20 text-green-400 rounded-xl sm:rounded-2xl hover:bg-green-500/30 transition-all border border-green-500/20 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6">
+                                                <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Resume</span>
                                             </button>
                                         )}
                                         <button
                                             onClick={() => handleAdminAction('sold-player')}
                                             disabled={!roomState?.currentBid.bidder || roomState?.status === 'paused'}
-                                            className="px-8 py-3 bg-primary text-white font-black text-xs rounded-2xl hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary/20"
+                                            className="px-4 sm:px-8 py-2 sm:py-3 bg-primary text-white font-black text-[10px] sm:text-xs rounded-xl sm:rounded-2xl hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-primary/20"
                                         >
-                                            <CheckCircle className="w-4 h-4" /> SOLD
+                                            <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> SOLD
                                         </button>
                                         <button
                                             onClick={() => handleAdminAction('unsold-player')}
                                             disabled={roomState?.currentBid.bidder || roomState?.status === 'paused'}
-                                            className="px-8 py-3 bg-gray-600 text-white font-black text-xs rounded-2xl hover:bg-gray-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
+                                            className="px-4 sm:px-8 py-2 sm:py-3 bg-gray-600 text-white font-black text-[10px] sm:text-xs rounded-xl sm:rounded-2xl hover:bg-gray-700 transition-all disabled:opacity-50 flex items-center gap-1.5 sm:gap-2 shadow-lg"
                                         >
-                                            <XCircle className="w-4 h-4" /> UNSOLD
+                                            <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> UNSOLD
                                         </button>
                                     </div>
                                 </div>
@@ -805,8 +841,102 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                     </section>
                 </div>
 
-                {/* Right Sidebar - Activity/Chat */}
-                <aside className="w-96 border-l border-white/5 bg-black/40 flex flex-col hidden lg:flex">
+                {/* Mobile-only Activity/Chat panel */}
+                {(activeTab === 'activity' || activeTab === 'chat') && (
+                    <div className="lg:hidden fixed inset-0 top-[57px] bottom-[56px] z-20 bg-[#080d09] flex flex-col overflow-hidden">
+                        <div className="p-3 border-b border-white/5 bg-black/60">
+                            <div className="flex p-1 bg-black/60 rounded-xl border border-white/5">
+                                <button
+                                    onClick={() => setActiveTab('activity')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'activity' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'}`}
+                                >
+                                    <Activity className="w-3 h-3" /> Activity
+                                </button>
+                                <button
+                                    onClick={() => { setActiveTab('chat'); setUnreadMessages(0); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === 'chat' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'}`}
+                                >
+                                    <MessageSquare className="w-3 h-3" /> Chat
+                                    {unreadMessages > 0 && activeTab !== 'chat' && (
+                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[7px] font-black rounded-full flex items-center justify-center border border-black">{unreadMessages}</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                            <AnimatePresence mode="popLayout">
+                                {activeTab === 'activity' ? (
+                                    <div className="space-y-3">
+                                        {(roomState?.activity || []).map((entry, i) => (
+                                            <motion.div
+                                                initial={{ opacity: 0, x: 20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                key={entry.id || i}
+                                                className={`p-3 rounded-xl border transition-all ${entry.type === 'SOLD' ? 'bg-green-500/10 border-green-500/30' :
+                                                        entry.type === 'SYSTEM' ? 'bg-primary/5 border-primary/20' :
+                                                            'bg-white/5 border-white/5'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className={`text-[8px] font-black uppercase ${entry.type === 'SOLD' ? 'text-green-400' : 'opacity-40'}`}>{entry.type}</span>
+                                                    <span className="text-[8px] opacity-20">{entry.time}</span>
+                                                </div>
+                                                <p className={`text-xs font-bold uppercase tracking-tight ${entry.type === 'SOLD' ? 'text-white' : 'text-white/70'}`}>{entry.message}</p>
+                                                {entry.type === 'SOLD' && (
+                                                    <div className="mt-2 pt-2 border-t border-green-500/10 flex justify-between items-center">
+                                                        <span className="text-[9px] font-black italic text-green-400 uppercase">{entry.bidder}</span>
+                                                        <span className="text-xs font-black text-primary italic">{formatPrice(entry.amount)}</span>
+                                                    </div>
+                                                )}
+                                                {entry.type === 'BID' && (
+                                                    <div className="mt-1.5 flex justify-between items-center bg-white/5 p-1.5 rounded-lg border border-white/5">
+                                                        <span className="text-[9px] font-black text-primary uppercase italic">{entry.bidder}</span>
+                                                        <span className="text-[10px] font-black text-white italic">{formatPrice(entry.amount)}</span>
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        ))}
+                                        {(!roomState?.activity || roomState.activity.length === 0) && (
+                                            <div className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-xs italic">No Activity Yet</div>
+                                        )}
+                                        <div ref={sidebarEndRef} />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {messages.map((m, i) => (
+                                            <div key={i} className={`flex flex-col ${m.user === user.name ? 'items-end' : 'items-start'}`}>
+                                                <div className={`p-3 rounded-xl text-[11px] max-w-[90%] leading-relaxed ${m.user === user.name ? 'bg-primary/20 border border-primary/20 rounded-br-none' : 'bg-white/5 border border-white/5 rounded-bl-none'}`}>
+                                                    <p className="font-black text-[9px] opacity-30 uppercase mb-1 tracking-widest">{m.user}</p>
+                                                    <p className="font-medium">{m.content}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {messages.length === 0 && <div className="py-20 text-center opacity-10 font-black uppercase tracking-widest text-xs italic">Frequency Quiet</div>}
+                                        <div ref={sidebarEndRef} />
+                                    </div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                        {activeTab === 'chat' && (
+                            <div className="p-3 border-t border-white/5 bg-black/60">
+                                <form onSubmit={handleSendMessage} className="relative">
+                                    <input
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs outline-none focus:border-primary transition-all placeholder:opacity-20 font-bold pr-10"
+                                        placeholder="Broadcast tactical message..."
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                    />
+                                    <button className="absolute right-2.5 top-2.5 p-1 text-primary hover:scale-110 transition-transform">
+                                        <Send className="w-4 h-4" />
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Right Sidebar - Activity/Chat (desktop only) */}
+                <aside className="w-80 xl:w-96 border-l border-white/5 bg-black/40 flex-col hidden lg:flex">
                     <div className="p-4 border-b border-white/5">
                         <div className="flex p-1 bg-black/60 rounded-xl border border-white/5">
                             <button
