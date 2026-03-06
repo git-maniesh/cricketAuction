@@ -4,11 +4,13 @@ import { Rocket, Zap, Timer, Star, Award, TrendingUp, Pause } from 'lucide-react
 import gsap from 'gsap';
 import defaultPlayerImg from '../assets/default-player.png';
 
-const PlayerDisplay = ({ highestBid, onBid, onHold, holds = [], userTeam, timeLeft, player, status, isAdmin, onUnsold }) => {
+const PlayerDisplay = ({ highestBid, onBid, onHold, holds = [], userTeam, timeLeft, player, status, isAdmin, onUnsold, globalSettings }) => {
     const portraitRef = useRef(null);
     const [imageError, setImageError] = useState(false);
     const isUserOnHold = holds.some(h => h.toUpperCase() === userTeam?.toUpperCase());
     const someonesOnHold = holds.length > 0;
+    const isFirstBid = highestBid?.bidder === null || highestBid?.bidder === undefined;
+    const allowedIncrements = globalSettings?.allowedIncrements || [0.25, 0.5, 1, 2, 5];
 
     const formatPrice = (amount) => {
         if (amount >= 1) return `₹${amount.toFixed(2)} Cr`;
@@ -93,7 +95,7 @@ const PlayerDisplay = ({ highestBid, onBid, onHold, holds = [], userTeam, timeLe
                         <div className="relative">
                             {/* Blinking Name Overlay */}
                             <motion.div
-                                key={player.name}
+                                key={player.name || "player-name"}
                                 animate={{
                                     opacity: [1, 0.8, 1],
                                     color: ["#ea2a33", "#000000", "#ea2a33"],
@@ -178,7 +180,7 @@ const PlayerDisplay = ({ highestBid, onBid, onHold, holds = [], userTeam, timeLe
                                 <div className="relative z-10 text-right">
                                     <AnimatePresence mode="wait">
                                         <motion.div
-                                            key={highestBid?.amount}
+                                            key={highestBid?.amount ?? 'base'}
                                             initial={{ y: 20, opacity: 0 }}
                                             animate={{ y: 0, opacity: 1 }}
                                             className="flex flex-col"
@@ -195,22 +197,32 @@ const PlayerDisplay = ({ highestBid, onBid, onHold, holds = [], userTeam, timeLe
                     </div>
 
                     <div className="mt-6 sm:mt-12 space-y-3 sm:space-y-4">
-                        <div className="bg-white/5 border border-white/10 rounded-[24px] sm:rounded-[32px] p-1.5 sm:p-2 flex gap-1.5 sm:gap-2 overflow-x-auto">
-                            {[0.25, 0.5, 1, 2, 5].map((inc) => {
-                                const bidAmt = (highestBid?.amount || player.basePrice) + inc;
-                                return (
-                                    <button
-                                        key={inc}
-                                        disabled={isPaused}
-                                        onClick={() => onBid(bidAmt)}
-                                        className="flex-1 min-w-[52px] py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-primary hover:text-white transition-all border border-white/5 hover:border-primary disabled:opacity-20 disabled:cursor-not-allowed group"
-                                    >
-                                        <span className="opacity-40 group-hover:opacity-100 transition-opacity block text-[9px] sm:text-xs">+{formatPriceOnly(inc)}</span>
-                                        <div className="text-[8px] sm:text-[10px] font-bold text-primary group-hover:text-white">{formatPrice(bidAmt)}</div>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        {isFirstBid ? (
+                            <button
+                                disabled={isPaused}
+                                onClick={() => onBid(player.basePrice)}
+                                className={`w-full py-4 sm:py-6 rounded-2xl font-black text-xl hover:bg-primary hover:text-white transition-all border border-primary disabled:opacity-20 disabled:cursor-not-allowed text-primary`}
+                            >
+                                BID BASE PRICE: {formatPrice(player.basePrice)}
+                            </button>
+                        ) : (
+                            <div className="bg-white/5 border border-white/10 rounded-[24px] sm:rounded-[32px] p-1.5 sm:p-2 flex gap-1.5 sm:gap-2 overflow-x-auto">
+                                {allowedIncrements.map((inc) => {
+                                    const bidAmt = (highestBid?.amount || player.basePrice) + inc;
+                                    return (
+                                        <button
+                                            key={inc}
+                                            disabled={isPaused}
+                                            onClick={() => onBid(bidAmt)}
+                                            className="flex-1 min-w-[52px] py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-primary hover:text-white transition-all border border-white/5 hover:border-primary disabled:opacity-20 disabled:cursor-not-allowed group"
+                                        >
+                                            <span className="opacity-40 group-hover:opacity-100 transition-opacity block text-[9px] sm:text-xs">+{formatPriceOnly(inc)}</span>
+                                            <div className="text-[8px] sm:text-[10px] font-bold text-primary group-hover:text-white">{formatPrice(bidAmt)}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <div className="flex gap-3 sm:gap-4">
                             <motion.button

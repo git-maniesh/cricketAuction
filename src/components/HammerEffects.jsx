@@ -66,22 +66,22 @@ const HammerEffects = ({ show, onComplete, type = 'SOLD' }) => {
     return (
         <div
             ref={overlayRef}
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-primary/10 backdrop-blur-sm pointer-events-none opacity-0"
+            className="fixed bottom-10 right-10 z-[300] flex items-center justify-center pointer-events-none opacity-0"
         >
             <div className="relative group">
                 {/* Glow effect */}
                 <div className="absolute inset-0 bg-primary/40 rounded-full blur-[20px] animate-pulse" />
 
-                <div ref={hammerRef} className="relative z-10 flex flex-col items-center">
-                    <div className="w-32 h-32 sm:w-48 sm:h-48 bg-surface-dark border-4 border-primary rounded-[32px] sm:rounded-[48px] flex items-center justify-center shadow-[0_0_80px_rgba(234,42,51,0.4)]">
-                        <Gavel className="w-16 h-16 sm:w-24 sm:h-24 text-primary" />
+                <div ref={hammerRef} className="relative z-10 flex flex-row items-center gap-4 bg-surface-dark/90 backdrop-blur-md p-4 pr-8 rounded-3xl border border-primary/50 shadow-[0_0_50px_rgba(234,42,51,0.5)]">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/50 border-2 border-primary rounded-2xl flex items-center justify-center shadow-inner">
+                        <Gavel className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
                     </div>
-                    <div className="mt-8 text-center">
-                        <h1 className="text-4xl sm:text-7xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_30px_rgba(234,42,51,0.8)] text-center px-4">
-                            {type === 'SOLD' ? 'SOLD!' : type === 'UNSOLD' ? 'UNSOLD' : type === 'CLOSING' ? 'FINAL CALL' : 'AUCTION OPEN'}
+                    <div className="text-left">
+                        <h1 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_15px_rgba(234,42,51,0.8)]">
+                            {type === 'SOLD' ? 'SOLD!' : type === 'UNSOLD' ? 'UNSOLD' : type === 'CLOSING' ? 'FINAL CALL' : 'ACTION!'}
                         </h1>
-                        <p className="text-primary font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] mt-2 animate-bounce text-[10px] sm:text-sm text-center px-2">
-                            {type === 'SOLD' ? 'New Legend Acquired' : type === 'UNSOLD' ? 'Moving to Next Asset' : type === 'CLOSING' ? 'Hammer About to Fall!' : 'Let the Bidding Begin'}
+                        <p className="text-primary font-black uppercase tracking-[0.2em] mt-1 text-[8px] sm:text-[10px] animate-pulse">
+                            {type === 'SOLD' ? 'Acquired' : type === 'UNSOLD' ? 'Next Asset' : type === 'CLOSING' ? 'Hammer Falling' : 'Open'}
                         </p>
                     </div>
                 </div>

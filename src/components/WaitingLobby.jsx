@@ -5,11 +5,17 @@ import * as XLSX from 'xlsx';
 
 const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) => {
     const fileInputRef = useRef(null);
+    const [notification, setNotification] = React.useState(null);
     const teams = roomState ? Object.values(roomState.teamNames) : [];
 
     const copyRoomId = () => {
         navigator.clipboard.writeText(roomId);
-        alert('Room ID copied to clipboard!');
+        showNotification('Room ID copied to clipboard!', 'success');
+    };
+
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 4000);
     };
 
     const handleExcelUpload = (e) => {
@@ -30,7 +36,7 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
                 ovr: parseInt(row.OVR || row.ovr || 80),
                 position: row.Position || row.position || 'N/A',
                 image: row.Image || row.image || null,
-                badges: row.Badges ? row.Badges.split(',') : ["Scouted"],
+                badges: row.Badges ? String(row.Badges).split(',') : ["Scouted"],
                 stats: [
                     { label: "VAL", value: parseInt(row.OVR || row.ovr || 80) }
                 ]
@@ -38,7 +44,9 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
 
             if (newPlayers.length > 0) {
                 socket.emit('update-players', { roomId, players: [...roomState.players, ...newPlayers] });
-                alert(`Successfully imported ${newPlayers.length} players!`);
+                showNotification(`Successfully imported ${newPlayers.length} players!`, 'success');
+            } else {
+                showNotification('No valid players found in the file.', 'error');
             }
         };
         reader.readAsArrayBuffer(file);
@@ -52,6 +60,27 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
                 <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
                 <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
             </div>
+
+            <AnimatePresence>
+                {notification && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -50, x: '-50%' }}
+                        animate={{ opacity: 1, y: 20, x: '-50%' }}
+                        exit={{ opacity: 0, y: -50, x: '-50%' }}
+                        className={`fixed top-0 left-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md flex items-center gap-3 ${notification.type === 'error'
+                            ? 'bg-red-500/20 border-red-500/40 text-red-100 shadow-red-500/20'
+                            : 'bg-green-500/20 border-green-500/40 text-green-100 shadow-green-500/20'
+                            }`}
+                    >
+                        {notification.type === 'error' ? (
+                            <Trash2 className="w-5 h-5 text-red-400" />
+                        ) : (
+                            <CheckCircle2 className="w-5 h-5 text-green-400" />
+                        )}
+                        <span className="font-bold text-sm">{notification.message}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="relative z-10 w-full max-w-5xl flex flex-col xl:grid xl:grid-cols-12 gap-6 sm:gap-10 items-start">
                 {/* Left Side: Room Info & Players */}
@@ -87,7 +116,7 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
                                 <AnimatePresence mode="popLayout">
                                     {teams.map((name, i) => (
                                         <motion.div
-                                            key={name}
+                                            key={name || `team-${i}`}
                                             initial={{ scale: 0.8, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
                                             exit={{ scale: 0.8, opacity: 0 }}
@@ -199,7 +228,7 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
                                             {isAdmin && (
                                                 <button
                                                     onClick={() => {
-                                                        console.log('Client: Emitting remove-player', { roomId, playerIndex: i });
+                                                        // console.log('Client: Emitting remove-player', { roomId, playerIndex: i });
                                                         socket.emit('remove-player', { roomId, playerIndex: i });
                                                     }}
                                                     className="p-1.5 sm:p-2 opacity-20 hover:opacity-100 hover:bg-red-500/20 text-red-500 transition-all rounded-lg flex-shrink-0 ml-2"
@@ -254,26 +283,33 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
                                         <div className="p-4 sm:p-6 bg-white/5 rounded-2xl sm:rounded-3xl border border-white/5 space-y-3 sm:space-y-4">
                                             <span className="text-[10px] font-black opacity-40 uppercase tracking-[0.2em] block">Manual Asset Entry</span>
                                             <div className="flex gap-2">
-                                                <input
+                                                <textarea
                                                     id="lobby-player-name"
-                                                    placeholder="Identity"
-                                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all min-w-0"
+                                                    rows={1}
+                                                    placeholder="Identity (paste multiple on new lines)"
+                                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all min-w-0 resize-y max-h-32 min-h-[42px]"
                                                 />
                                                 <input
                                                     id="lobby-player-price"
                                                     type="number"
                                                     placeholder="$$$"
-                                                    className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-xl px-2 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all"
+                                                    className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-xl px-2 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all h-[42px]"
                                                 />
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    const name = document.getElementById('lobby-player-name').value;
+                                                    const nameValue = document.getElementById('lobby-player-name').value;
                                                     const price = parseFloat(document.getElementById('lobby-player-price').value);
-                                                    if (name && !isNaN(price)) {
-                                                        socket.emit('add-player', { roomId, player: { name, basePrice: price } });
+                                                    if (nameValue && !isNaN(price)) {
+                                                        const names = nameValue.split('\n').filter(n => n.trim().length > 0);
+                                                        names.forEach(name => {
+                                                            socket.emit('add-player', { roomId, player: { name: name.trim(), basePrice: price } });
+                                                        });
                                                         document.getElementById('lobby-player-name').value = '';
                                                         document.getElementById('lobby-player-price').value = '';
+                                                        showNotification(`Added ${names.length} player(s) to registry!`, 'success');
+                                                    } else {
+                                                        showNotification('Please provide valid Identity and Price', 'error');
                                                     }
                                                 }}
                                                 className="w-full bg-primary/20 text-primary border border-primary/30 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-primary hover:text-white transition-all shadow-lg hover:shadow-primary/20"

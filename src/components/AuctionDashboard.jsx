@@ -41,6 +41,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
     const [hammerType, setHammerType] = useState('SOLD');
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [notification, setNotification] = useState(null);
     const fileInputRef = React.useRef(null);
     const sidebarEndRef = React.useRef(null);
     const lastClosingTriggered = React.useRef(null);
@@ -71,9 +72,15 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
         }, 250);
     };
 
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 4000);
+    };
+
     const copyRoomId = () => {
         navigator.clipboard.writeText(roomId);
         setShowCopied(true);
+        showNotification('Room ID copied to clipboard!');
         setTimeout(() => setShowCopied(false), 2000);
     };
 
@@ -81,7 +88,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
         if (!socket || !isAdmin) return;
 
         socket.on('admin-notification', (data) => {
-            console.log('Admin Notification received:', data);
+            // console.log('Admin Notification received:', data);
             setAdminNotify(data);
             // Auto hide after 5 seconds
             setTimeout(() => setAdminNotify(null), 5000);
@@ -97,7 +104,6 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
     useEffect(() => {
         socket.on('message', (msg) => {
             setMessages(prev => [...prev, msg].slice(-20));
-            // FIXED: Only increment if not on chat tab
             setSidebarTab(currentTab => {
                 if (currentTab !== 'chat') {
                     setUnreadMessages(prev => prev + 1);
@@ -106,22 +112,25 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
             });
         });
 
+        socket.on('timer-update', ({ timeLeft }) => {
+            setRoomState(prev => prev ? { ...prev, timeLeft } : prev);
+        });
+
         socket.on('activity-update', (entry) => {
-            console.log('Activity Update:', entry);
+            // console.log('Activity Update:', entry);
             if (entry.message === 'AUCTION STARTED') {
                 setHammerType('OPEN');
                 setShowHammer(true);
             }
         });
 
-        socket.on('new-bid', (bid) => {
-            setRoomState(prev => ({
+        socket.on('new-bid', ({ currentBid, timeLeft, bids }) => {
+            setRoomState(prev => prev ? ({
                 ...prev,
-                currentBid: bid,
-                timeLeft: 45
-            }));
-            // Clear selected team view if a bid happens to keep focus on live auction? 
-            // Actually better to keep it unless user switches.
+                currentBid,
+                bids: bids || prev.bids,
+                timeLeft: timeLeft || 60
+            }) : prev);
         });
 
         socket.on('room-update', (state) => {
@@ -150,6 +159,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
 
         return () => {
             socket.off('message');
+            socket.off('timer-update');
             socket.off('activity-update');
             socket.off('new-bid');
             socket.off('room-update');
@@ -185,7 +195,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
             console.warn('Hold failed: socket or teamName missing', { socket: !!socket, teamName: user.teamName });
             return;
         }
-        console.log(`Emitting toggle-hold for ${user.teamName} in room ${roomId}`);
+        // console.log(`Emitting toggle-hold for ${user.teamName} in room ${roomId}`);
         socket.emit('toggle-hold', { roomId, teamName: user.teamName });
     };
 
@@ -215,7 +225,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                 ovr: parseInt(row.OVR || row.ovr || 80),
                 position: row.Position || row.position || 'N/A',
                 image: row.Image || row.image || `https://api.dicebear.com/7.x/initials/svg?seed=${row.Name || 'Player'}&backgroundColor=03001C`,
-                badges: row.Badges ? row.Badges.split(',') : ["Mid-Auction Entry"],
+                badges: row.Badges ? String(row.Badges).split(',') : ["Mid-Auction Entry"],
                 stats: [
                     { label: "VAL", value: parseInt(row.OVR || row.ovr || 80) }
                 ]
@@ -223,31 +233,49 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
 
             if (newPlayers.length > 0) {
                 socket.emit('update-players', { roomId, players: [...roomState.players, ...newPlayers] });
-                alert(`Successfully injected ${newPlayers.length} players into the live roster!`);
+                showNotification(`Successfully injected ${newPlayers.length} players into the live roster!`, 'success');
+            } else {
+                showNotification('No valid players found in the file.', 'error');
             }
         };
         reader.readAsArrayBuffer(file);
     };
 
     const handleAddPlayer = () => {
-        const name = document.getElementById('admin-player-name').value;
+        const nameValue = document.getElementById('admin-player-name').value;
         const price = parseFloat(document.getElementById('admin-player-price').value);
-        if (name && !isNaN(price)) {
-            socket.emit('add-player', { roomId, player: { name, basePrice: price } });
+        if (nameValue && !isNaN(price)) {
+            const names = nameValue.split('\n').filter(n => n.trim().length > 0);
+            names.forEach(name => {
+                socket.emit('add-player', { roomId, player: { name: name.trim(), basePrice: price } });
+            });
             document.getElementById('admin-player-name').value = '';
             document.getElementById('admin-player-price').value = '';
+            showNotification(`Added ${names.length} player(s) to roster!`, 'success');
         } else {
-            alert('Please provide valid Name and Price');
+            showNotification('Please provide valid Name and Price', 'error');
         }
     };
 
     const handleBid = (amount) => {
-        if (roomState?.status !== 'active') return alert('Auction is not active');
+        if (roomState?.status !== 'active') return showNotification('Auction is disabled/paused', 'error');
         socket.emit('place-bid', { roomId, amount, bidder: user.teamName });
     };
 
     const handleAdminAction = (action) => {
         socket.emit(action, roomId);
+    };
+
+    const toggleIncrement = (increment) => {
+        if (!isAdmin) return;
+        const currentIncrements = roomState?.globalSettings?.allowedIncrements || [0.25, 0.5, 1, 2, 5];
+        let newIncrements;
+        if (currentIncrements.includes(increment)) {
+            newIncrements = currentIncrements.filter(i => i !== increment);
+        } else {
+            newIncrements = [...currentIncrements, increment].sort((a, b) => a - b);
+        }
+        socket.emit('set-increments', { roomId, increments: newIncrements });
     };
 
     const currentPlayer = roomState?.players[roomState.currentPlayerIndex];
@@ -495,6 +523,35 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                                         >
                                             <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> UNSOLD
                                         </button>
+                                        <button
+                                            onClick={() => handleAdminAction('revert-bid')}
+                                            disabled={roomState?.bids?.length === 0 || roomState?.status === 'paused'}
+                                            className="px-4 py-2 sm:py-3 bg-purple-600/50 text-white font-black text-[10px] sm:text-xs rounded-xl sm:rounded-2xl hover:bg-purple-700 transition-all disabled:opacity-50 flex items-center gap-1.5 sm:gap-2"
+                                        >
+                                            Revert Bid
+                                        </button>
+                                        <button
+                                            onClick={() => handleAdminAction('reset-bid')}
+                                            disabled={roomState?.bids?.length === 0 || roomState?.status === 'paused'}
+                                            className="px-4 py-2 sm:py-3 bg-red-600/50 text-white font-black text-[10px] sm:text-xs rounded-xl sm:rounded-2xl hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-1.5 sm:gap-2"
+                                        >
+                                            Reset Bid
+                                        </button>
+                                    </div>
+                                    <div className="w-full flex gap-2 items-center mt-3 border-t border-white/5 pt-3">
+                                        <span className="text-[10px] font-black uppercase text-primary">Allowed Raises:</span>
+                                        {[0.25, 0.5, 1, 2, 5, 10, 20].map(inc => {
+                                            const isEnabled = (roomState?.globalSettings?.allowedIncrements || [0.25, 0.5, 1, 2, 5]).includes(inc);
+                                            return (
+                                                <button
+                                                    key={inc}
+                                                    onClick={() => toggleIncrement(inc)}
+                                                    className={`px-2 py-1 rounded text-[10px] font-bold ${isEnabled ? 'bg-primary text-white' : 'bg-white/10 text-white/40'}`}
+                                                >
+                                                    {inc}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -510,6 +567,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                                         timeLeft={roomState?.timeLeft || 0}
                                         player={currentPlayer}
                                         status={roomState?.status}
+                                        globalSettings={roomState?.globalSettings}
                                     />
 
                                     {/* Upcoming Players Card */}
@@ -740,10 +798,11 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                                             <div className="space-y-4">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 px-2">Identity</label>
-                                                    <input
+                                                    <textarea
                                                         id="admin-player-name"
-                                                        placeholder="Name of the player"
-                                                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-primary transition-all font-bold"
+                                                        rows={2}
+                                                        placeholder="Name(s) of player(s) (paste multiple on new lines)"
+                                                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-primary transition-all font-bold resize-y"
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
@@ -873,8 +932,8 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, initialRoomState }) =
                                                 animate={{ opacity: 1, x: 0 }}
                                                 key={entry.id || i}
                                                 className={`p-3 rounded-xl border transition-all ${entry.type === 'SOLD' ? 'bg-green-500/10 border-green-500/30' :
-                                                        entry.type === 'SYSTEM' ? 'bg-primary/5 border-primary/20' :
-                                                            'bg-white/5 border-white/5'
+                                                    entry.type === 'SYSTEM' ? 'bg-primary/5 border-primary/20' :
+                                                        'bg-white/5 border-white/5'
                                                     }`}
                                             >
                                                 <div className="flex justify-between items-center mb-1">

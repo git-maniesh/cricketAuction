@@ -31,7 +31,7 @@ const CRICKET_PLAYERS = [
     { name: "Jasprit Bumrah", basePrice: 15.0, ovr: 91, position: "Bowler", image: null, badges: ["Yorker King", "Elite"], stats: [{ label: "VAL", value: 91 }] }
 ];
 
-const AUCTION_TIMER_SECONDS = 45;
+const AUCTION_TIMER_SECONDS = 60;
 
 // Helper to add activity entry
 function addActivity(roomId, entry) {
@@ -131,21 +131,22 @@ setInterval(() => {
                 if (room.timeLeft === 0) {
                     processPlayerSale(roomId);
                 } else {
-                    io.to(roomId).emit('room-update', room);
+                    io.to(roomId).emit('timer-update', { timeLeft: room.timeLeft });
                 }
             } else if (hasHolds) {
                 // Keep heartbeat update so UI sees the "on hold" state even if timer is frozen
-                io.to(roomId).emit('room-update', room);
+                // Emit lightweight payload
+                io.to(roomId).emit('timer-update', { timeLeft: room.timeLeft });
             }
         }
     });
 }, 1000);
 
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    // console.log('User connected:', socket.id);
 
     socket.on('create-room', (roomId) => {
-        console.log(`Server: Creating room ${roomId}`);
+        // console.log(`Server: Creating room ${roomId}`);
         rooms.set(roomId, {
             adminSocket: socket.id,
             adminTeam: null,
@@ -184,7 +185,7 @@ io.on('connection', (socket) => {
             const oldSocketId = Object.keys(room.teamNames).find(id => room.teamNames[id] === teamName && id !== socket.id);
 
             if (oldSocketId) {
-                console.log(`User ${teamName} rejoining. Old Socket: ${oldSocketId}, New Socket: ${socket.id}`);
+                // console.log(`User ${teamName} rejoining. Old Socket: ${oldSocketId}, New Socket: ${socket.id}`);
                 delete room.teamNames[oldSocketId];
                 addActivity(roomId, { type: 'SYSTEM', message: `${teamName.toUpperCase()} REJOINED THE ROOM` });
 
@@ -216,7 +217,7 @@ io.on('connection', (socket) => {
 
     socket.on('toggle-hold', ({ roomId, teamName }) => {
         const room = rooms.get(roomId);
-        console.log(`Hold Toggle: Room=${roomId}, Team=${teamName}, CurrentStatus=${room?.status}`);
+        // console.log(`Hold Toggle: Room=${roomId}, Team=${teamName}, CurrentStatus=${room?.status}`);
 
         if (room && (room.status === 'active' || room.status === 'paused')) {
             if (!room.holds) room.holds = [];
@@ -315,7 +316,7 @@ io.on('connection', (socket) => {
             if (!isNaN(index) && index >= 0 && index < room.players.length) {
                 // Return a new array to ensure state detection
                 room.players = room.players.filter((_, i) => i !== index);
-                console.log(`Server: Removed player at index ${index} in room ${roomId}`);
+                // console.log(`Server: Removed player at index ${index} in room ${roomId}`);
                 io.to(roomId).emit('room-update', { ...room });
             }
         }
@@ -326,7 +327,7 @@ io.on('connection', (socket) => {
         if (room && room.adminSocket === socket.id) {
             const oldCount = room.players.length;
             room.players = players;
-            console.log(`Server: Updated player list for room ${roomId}, count: ${players.length}`);
+            // console.log(`Server: Updated player list for room ${roomId}, count: ${players.length}`);
 
             // Auto-resume if it was finished and players were added
             if (room.status === 'finished' && room.players.length > room.currentPlayerIndex) {
@@ -365,24 +366,24 @@ io.on('connection', (socket) => {
     });
 
     socket.on('pause-auction', (roomId) => {
-        console.log(`Server: Received pause-auction for room ${roomId} from socket ${socket.id}`);
+        // console.log(`Server: Received pause-auction for room ${roomId} from socket ${socket.id}`);
         const room = rooms.get(roomId);
         if (room) {
             if (room.adminSocket === socket.id) {
                 room.status = 'paused';
-                console.log(`Server: Room ${roomId} status set to PAUSED`);
+                // console.log(`Server: Room ${roomId} status set to PAUSED`);
                 addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION PAUSED BY ADMIN' });
                 io.to(roomId).emit('room-update', room);
             } else {
-                console.log(`Server: Pause rejected - not admin. Admin: ${room.adminSocket}, Requester: ${socket.id}`);
+                // console.log(`Server: Pause rejected - not admin. Admin: ${room.adminSocket}, Requester: ${socket.id}`);
             }
         } else {
-            console.log(`Server: Pause failed - room ${roomId} not found`);
+            // console.log(`Server: Pause failed - room ${roomId} not found`);
         }
     });
 
     socket.on('resume-auction', (roomId) => {
-        console.log(`Server: Received resume-auction for room ${roomId} from socket ${socket.id}`);
+        // console.log(`Server: Received resume-auction for room ${roomId} from socket ${socket.id}`);
         const room = rooms.get(roomId);
         if (room) {
             if (room.adminSocket === socket.id) {
@@ -391,14 +392,14 @@ io.on('connection', (socket) => {
                 if (room.timeLeft <= 0) {
                     room.timeLeft = AUCTION_TIMER_SECONDS;
                 }
-                console.log(`Server: Room ${roomId} status set to ACTIVE`);
+                // console.log(`Server: Room ${roomId} status set to ACTIVE`);
                 addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION RESUMED BY ADMIN' });
                 io.to(roomId).emit('room-update', room);
             } else {
-                console.log(`Server: Resume rejected - not admin. Admin: ${room.adminSocket}, Requester: ${socket.id}`);
+                // console.log(`Server: Resume rejected - not admin. Admin: ${room.adminSocket}, Requester: ${socket.id}`);
             }
         } else {
-            console.log(`Server: Resume failed - room ${roomId} not found`);
+            //  console.log(`Server: Resume failed - room ${roomId} not found`);
         }
     });
 
@@ -423,7 +424,7 @@ io.on('connection', (socket) => {
             const isValidAmount = room.currentBid.bidder === null ? amount >= currentAmount : amount > currentAmount;
             const hasBudget = (room.budgets[bidder] || 0) >= amount;
 
-            console.log(`Bid Attempt: Team ${bidder} bid ${amount} in room ${roomId}. Valid: ${isValidAmount}, HasBudget: ${hasBudget} (Budget: ${room.budgets[bidder]})`);
+            // console.log(`Bid Attempt: Team ${bidder} bid ${amount} in room ${roomId}. Valid: ${isValidAmount}, HasBudget: ${hasBudget} (Budget: ${room.budgets[bidder]})`);
 
             if (isValidAmount && hasBudget) {
                 room.currentBid = { amount, bidder };
@@ -437,24 +438,63 @@ io.on('connection', (socket) => {
                     message: `${bidder.toUpperCase()} PLACED A BID OF ₹${amount.toFixed(2)}Cr`
                 });
 
-                // Add bid commentary
-                addActivity(roomId, {
-                    type: 'SYSTEM',
-                    message: `Oops ${bidder} enters again 😅`
-                });
+                // Add bid commentary - randomly only sometimes to not spam history
+                if (Math.random() > 0.5) {
+                    addActivity(roomId, {
+                        type: 'SYSTEM',
+                        message: `Oops ${bidder} enters again 😅`
+                    });
+                }
 
-                io.to(roomId).emit('new-bid', room.currentBid);
-                io.to(roomId).emit('room-update', room);
-                console.log(`Bid Accepted: ${bidder} now leading with ${amount}`);
+                // Send a lightweight representation of the bids array (just the last few) to save bandwidth
+                const lightweightBids = room.bids.slice(-5);
+                io.to(roomId).emit('new-bid', { currentBid: room.currentBid, timeLeft: room.timeLeft, bids: lightweightBids });
+                // console.log(`Bid Accepted: ${bidder} now leading with ${amount}`);
             } else {
-                console.log(`Bid Rejected: ${bidder} attempt of ${amount} failed. Reason: ${!isValidAmount ? 'Invalid Amount' : 'Insufficient Budget'}`);
+                // console.log(`Bid Rejected: ${bidder} attempt of ${amount} failed. Reason: ${!isValidAmount ? 'Invalid Amount' : 'Insufficient Budget'}`);
             }
         } else {
             if (room) {
-                console.log(`Bid Ignored: Auction status is ${room.status} (Room ${roomId})`);
+                // console.log(`Bid Ignored: Auction status is ${room.status} (Room ${roomId})`);
             } else {
-                console.log(`Bid Ignored: Room ${roomId} not found`);
+                // console.log(`Bid Ignored: Room ${roomId} not found`);
             }
+        }
+    });
+
+    socket.on('revert-bid', (roomId) => {
+        const room = rooms.get(roomId);
+        if (room && room.adminSocket === socket.id) {
+            if (room.bids && room.bids.length > 0) {
+                room.bids.pop(); // remove last bid
+                const prevBid = room.bids.length > 0 ? room.bids[room.bids.length - 1] : null;
+                if (prevBid) {
+                    room.currentBid = { amount: prevBid.amount, bidder: prevBid.bidder };
+                } else {
+                    const currentPlayer = room.players[room.currentPlayerIndex];
+                    room.currentBid = { amount: currentPlayer ? currentPlayer.basePrice : 0, bidder: null };
+                }
+                io.to(roomId).emit('room-update', room);
+            }
+        }
+    });
+
+    socket.on('reset-bid', (roomId) => {
+        const room = rooms.get(roomId);
+        if (room && room.adminSocket === socket.id) {
+            room.bids = [];
+            const currentPlayer = room.players[room.currentPlayerIndex];
+            room.currentBid = { amount: currentPlayer ? currentPlayer.basePrice : 0, bidder: null };
+            room.timeLeft = AUCTION_TIMER_SECONDS;
+            io.to(roomId).emit('room-update', room);
+        }
+    });
+
+    socket.on('set-increments', ({ roomId, increments }) => {
+        const room = rooms.get(roomId);
+        if (room && room.adminSocket === socket.id) {
+            room.globalSettings.allowedIncrements = increments;
+            io.to(roomId).emit('room-update', room);
         }
     });
 
@@ -467,7 +507,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+        // console.log('User disconnected:', socket.id);
+
+        // Basic cleanup: find if this socket was a team, but don't delete immediately to allow fast rejoins
+        // We could implement a real timeout garbage collection here if needed for super high scales
+        rooms.forEach((room, roomId) => {
+            if (room.teamNames[socket.id]) {
+                // console.log(`Socket ${socket.id} (Team: ${room.teamNames[socket.id]}) disconnected from room ${roomId}`);
+            }
+        });
     });
 });
 

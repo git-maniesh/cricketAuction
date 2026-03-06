@@ -18,11 +18,11 @@ function App() {
 
   useEffect(() => {
     socket.on('connect', () => {
-      console.log('Client: Socket connected', socket.id);
+      // console.log('Client: Socket connected', socket.id);
       setConnected(true);
     });
     socket.on('disconnect', () => {
-      console.log('Client: Socket disconnected');
+      // console.log('Client: Socket disconnected');
       setConnected(false);
     });
     socket.on('connect_error', (err) => {
@@ -31,14 +31,14 @@ function App() {
     });
 
     socket.on('room-created', (id) => {
-      console.log('Client: room-created received', id);
+      // console.log('Client: room-created received', id);
       setRoomId(id);
       setIsAdmin(true);
       setView('waiting');
     });
 
     socket.on('room-joined', ({ roomId, state, isAdmin }) => {
-      console.log('Client: room-joined received', roomId);
+      // console.log('Client: room-joined received', roomId);
       setRoomId(roomId);
       setRoomState(state);
       setIsAdmin(isAdmin);
@@ -52,17 +52,17 @@ function App() {
     });
 
     socket.on('admin-status', (status) => {
-      console.log('Client: admin-status updated', status);
+      // console.log('Client: admin-status updated', status);
       setIsAdmin(status);
     });
 
     socket.on('room-update', (state) => {
-      console.log('Client: room-update received', state.players?.length, 'players');
+      // console.log('Client: room-update received', state.players?.length, 'players');
       setRoomState({ ...state });
     });
 
     socket.on('auction-started', ({ state }) => {
-      console.log('Client: auction-started received', state);
+      // console.log('Client: auction-started received', state);
       if (state) setRoomState(state);
       setView('auction');
     });
@@ -82,7 +82,7 @@ function App() {
   }, []);
 
   const handleJoin = (id, teamName) => {
-    console.log('Client: handleJoin called with id', id);
+    // console.log('Client: handleJoin called with id', id);
     if (!id) return alert('Please enter a Room ID');
     if (!teamName) return alert('Please enter a Team Name');
     setUser(prev => ({ ...prev, teamName }));
@@ -91,10 +91,10 @@ function App() {
   };
 
   const handleCreate = (teamName) => {
-    console.log('Client: handleCreate called');
+    // console.log('Client: handleCreate called');
     if (!teamName) return alert('Please enter a Team Name');
     const id = '#' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    console.log('Client: Generated roomId', id);
+    // console.log('Client: Generated roomId', id);
     setUser(prev => ({ ...prev, teamName }));
     socket.emit('create-room', id);
     socket.emit('set-team-name', { roomId: id, teamName });
