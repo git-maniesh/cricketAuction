@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
@@ -18,6 +19,44 @@ const io = new Server(httpServer, {
 });
 
 const rooms = new Map();
+
+const roomSchema = new mongoose.Schema({
+    roomId: { type: String, required: true, unique: true },
+    data: { type: mongoose.Schema.Types.Mixed, required: true }
+});
+const RoomModel = mongoose.model('Room', roomSchema);
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/auctionDB")
+    .then(async () => {
+        console.log('Connected to MongoDB');
+        try {
+            const existingRooms = await RoomModel.find({});
+            existingRooms.forEach(roomDoc => {
+                rooms.set(roomDoc.roomId, roomDoc.data);
+            });
+            console.log(`Loaded ${existingRooms.length} rooms from database`);
+        } catch (err) {
+            console.error('Error loading rooms from DB:', err);
+        }
+    })
+    .catch(err => console.error('MongoDB connection error:', err));
+
+// Periodic saving loop: sync memory to DB every 5 seconds
+setInterval(async () => {
+    // To prevent concurrent modification issues or long delays, we run saves async
+    const savePromises = [];
+    for (const [roomId, roomData] of rooms.entries()) {
+        savePromises.push(
+            RoomModel.findOneAndUpdate(
+                { roomId },
+                { data: roomData },
+                { upsert: true, new: true }
+            ).catch(err => console.error(`Failed to save room ${roomId} to DB:`, err))
+        );
+    }
+    await Promise.all(savePromises);
+}, 5000);
 
 const DEFAULT_PLAYERS = [
     { name: "Lionel Messi", basePrice: 20.0, ovr: 91, position: "RW", image: null, badges: ["GOAT", "Playmaker"], stats: [{ label: "VAL", value: 91 }] },
