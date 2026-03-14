@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "animejs": "^4.3.6",
     "canvas-confetti": "^1.9.4",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "framer-motion": "^12.34.4",
@@ -21,6 +25,7 @@
     "react-dom": "^19.2.0",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
+    "three": "^0.183.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

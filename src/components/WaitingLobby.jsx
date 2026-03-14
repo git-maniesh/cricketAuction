@@ -1,21 +1,32 @@
-import React, { useRef } from 'react';
-import { Trophy, ArrowRight, Users, Settings, Plus, Copy, CheckCircle2, FileUp, Trash2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+    Users, Plus, Trash2, Play, Upload, Settings, 
+    Shield, ChevronRight, X, UserMinus, Crown, 
+    LogOut, FileSpreadsheet, Info, Copy, CheckCircle2
+} from 'lucide-react';
 
-const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) => {
+const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction, onExit }) => {
+    const [activeTab, setActiveTab] = useState('players'); // 'players', 'teams', 'settings'
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [notification, setNotification] = useState(null);
+    const [newPlayer, setNewPlayer] = useState({ name: '', basePrice: '', ovr: '', position: '', image: '' });
     const fileInputRef = useRef(null);
-    const [notification, setNotification] = React.useState(null);
-    const teams = roomState ? Object.values(roomState.teamNames) : [];
 
-    const copyRoomId = () => {
-        navigator.clipboard.writeText(roomId);
-        showNotification('Room ID copied to clipboard!', 'success');
-    };
+    if (!roomState) return null;
+
+    const teams = Object.values(roomState.userToTeam || {});
+    const players = roomState.players || [];
 
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
         setTimeout(() => setNotification(null), 4000);
+    };
+
+    const copyRoomId = () => {
+        navigator.clipboard.writeText(roomId);
+        showNotification('Room ID copied!', 'success');
     };
 
     const handleExcelUpload = (e) => {
@@ -23,317 +34,373 @@ const WaitingLobby = ({ roomId, roomState, isAdmin, socket, onStartAuction }) =>
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
-            const data = new Uint8Array(event.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                const data = XLSX.utils.sheet_to_json(ws);
 
-            const newPlayers = jsonData.map(row => ({
-                name: row.Name || row.name || 'Unknown',
-                basePrice: parseFloat(row.Price || row.price || row.BasePrice || 0),
-                ovr: parseInt(row.OVR || row.ovr || 80),
-                position: row.Position || row.position || 'N/A',
-                image: row.Image || row.image || null,
-                badges: row.Badges ? String(row.Badges).split(',') : ["Scouted"],
-                stats: [
-                    { label: "VAL", value: parseInt(row.OVR || row.ovr || 80) }
-                ]
-            })).filter(p => p.name !== 'Unknown');
+                const formattedPlayers = data.map(row => ({
+                    name: row.Name || row.name || 'Unknown',
+                    basePrice: parseFloat(row.Price || row.price || row.BasePrice || 1),
+                    ovr: parseInt(row.OVR || row.ovr || row.Rating || 80),
+                    position: row.Position || row.position || 'N/A',
+                    image: row.Image || row.image || 'https://img.freepik.com/free-vector/shining-fist-man-white-background-strong-muscles-athlete_1142-43097.jpg',
+                    badges: row.Badges ? String(row.Badges).split(',') : ['Registry Entry'],
+                    stats: [{ label: 'VAL', value: parseInt(row.OVR || row.ovr || 80) }]
+                }));
 
-            if (newPlayers.length > 0) {
-                socket.emit('update-players', { roomId, players: [...roomState.players, ...newPlayers] });
-                showNotification(`Successfully imported ${newPlayers.length} players!`, 'success');
-            } else {
-                showNotification('No valid players found in the file.', 'error');
+                socket.emit('update-players', { roomId, players: formattedPlayers });
+                showNotification(`Imported ${formattedPlayers.length} players`, 'success');
+            } catch (err) {
+                showNotification('Excel parse error', 'error');
             }
         };
-        reader.readAsArrayBuffer(file);
+        reader.readAsBinaryString(file);
+    };
+
+    const handleAddPlayer = () => {
+        if (!newPlayer.name || !newPlayer.basePrice) return;
+        const playerToEmit = {
+            ...newPlayer,
+            image: newPlayer.image || 'https://img.freepik.com/free-vector/shining-fist-man-white-background-strong-muscles-athlete_1142-43097.jpg'
+        };
+        socket.emit('add-player', { roomId, player: playerToEmit });
+        setNewPlayer({ name: '', basePrice: '', ovr: '', position: '', image: '' });
+        setShowAddModal(false);
+        showNotification('Player registered successfully', 'success');
     };
 
     return (
-        <div className="min-h-screen relative flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-transparent">
-            {/* Ambient Background */}
-            <div className="fixed inset-0 z-0">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
-                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px]" />
-            </div>
-
+        <div className="min-h-screen bg-[#080d09] flex flex-col font-display text-white">
+            {/* Global Notifications */}
             <AnimatePresence>
                 {notification && (
                     <motion.div
-                        initial={{ opacity: 0, y: -50, x: '-50%' }}
+                        initial={{ opacity: 0, y: -20, x: '-50%' }}
                         animate={{ opacity: 1, y: 20, x: '-50%' }}
-                        exit={{ opacity: 0, y: -50, x: '-50%' }}
-                        className={`fixed top-0 left-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md flex items-center gap-3 ${notification.type === 'error'
-                            ? 'bg-red-500/20 border-red-500/40 text-red-100 shadow-red-500/20'
-                            : 'bg-green-500/20 border-green-500/40 text-green-100 shadow-green-500/20'
-                            }`}
+                        exit={{ opacity: 0, y: -20, x: '-50%' }}
+                        className="fixed top-0 left-1/2 z-[100] px-6 py-3 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center gap-3 shadow-2xl"
                     >
-                        {notification.type === 'error' ? (
-                            <Trash2 className="w-5 h-5 text-red-400" />
-                        ) : (
-                            <CheckCircle2 className="w-5 h-5 text-green-400" />
-                        )}
-                        <span className="font-bold text-sm">{notification.message}</span>
+                        {notification.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Info className="w-4 h-4 text-red-400" />}
+                        <span className="text-xs font-black uppercase tracking-widest">{notification.message}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <div className="relative z-10 w-full max-w-5xl flex flex-col xl:grid xl:grid-cols-12 gap-6 sm:gap-10 items-start">
-                {/* Left Side: Room Info & Players */}
-                <div className="xl:col-span-8 flex flex-col items-center xl:items-start text-center xl:text-left w-full">
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-primary/20 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-primary/30 mb-6 sm:mb-8 shadow-[0_0_50px_rgba(234,42,51,0.2)] inline-block"
+            {/* Header */}
+            <header className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between backdrop-blur-md bg-black/20 sticky top-0 z-30">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                    </div>
+                    <div>
+                        <h2 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Synchronizing Lobby</h2>
+                        <h1 className="text-xl sm:text-2xl font-black italic uppercase tracking-tight flex items-center gap-2">
+                            {roomId}
+                            <button onClick={copyRoomId} className="p-1 hover:text-primary transition-colors"><Copy className="w-3 h-3 h-3" /></button>
+                        </h1>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 sm:gap-4">
+                    {isAdmin && players.length > 0 && (
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={onStartAuction}
+                            className="bg-primary hover:bg-red-700 text-white px-4 sm:px-8 py-2.5 sm:py-3 rounded-xl font-black italic uppercase tracking-widest text-[10px] sm:text-xs flex items-center gap-2 sm:gap-3 shadow-xl transition-all"
+                        >
+                            <Play className="w-3 h-3 sm:w-4 sm:h-4 fill-white" />
+                            Launch
+                        </motion.button>
+                    )}
+                    <button 
+                        onClick={onExit}
+                        className="p-2.5 sm:p-3 rounded-xl bg-white/5 hover:bg-red-500/10 hover:text-red-500 transition-all border border-white/5"
                     >
-                        <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
-                    </motion.div>
+                        <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                </div>
+            </header>
 
-                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-3 sm:mb-4 italic tracking-tighter uppercase leading-none break-all sm:break-normal">
-                        Arena <span className="text-primary">{roomId}</span>
-                    </h1>
-                    <p className="text-white/40 mb-8 sm:mb-12 uppercase tracking-[0.4em] font-black text-[10px] sm:text-xs px-2 xl:px-0">Waiting for rival bidders to synchronize...</p>
+            <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* Left: Navigation */}
+                <div className="lg:col-span-3 space-y-6">
+                    <div className="space-y-2">
+                        {['players', 'teams', 'settings'].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all border ${
+                                    activeTab === tab 
+                                    ? 'bg-primary/10 border-primary/30 text-primary' 
+                                    : 'bg-white/5 border-transparent text-white/40 hover:bg-white/10 hover:text-white/60'
+                                }`}
+                            >
+                                <span className="text-[10px] font-black uppercase tracking-widest">{tab}</span>
+                                {tab === 'players' && <span className="text-[10px] font-bold bg-white/10 px-2 py-0.5 rounded-full">{players.length}</span>}
+                                {tab === 'teams' && <span className="text-[10px] font-bold bg-white/10 px-2 py-0.5 rounded-full">{teams.length}</span>}
+                                {activeTab === tab && <ChevronRight className="w-4 h-4" />}
+                            </button>
+                        ))}
+                    </div>
 
-                    <div className="w-full bg-surface-dark/40 backdrop-blur-3xl border border-white/5 rounded-[32px] sm:rounded-[48px] p-6 sm:p-10 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute -inset-2 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                    <div className="p-6 rounded-[32px] bg-white/5 border border-white/10 space-y-4">
+                        <div className="flex items-center gap-3 text-white/30">
+                            <Shield className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Protocol</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold opacity-60">Your Role</span>
+                            <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${isAdmin ? 'bg-primary/20 text-primary' : 'bg-blue-500/20 text-blue-400'}`}>
+                                {isAdmin ? 'ADMIN' : 'USER'}
+                            </span>
+                        </div>
+                        <div className="pt-4 border-t border-white/5">
+                            <p className="text-[10px] text-white/20 leading-relaxed font-medium">
+                                {isAdmin 
+                                    ? "Full administrative access. Manage roster, kick players, and initiate the draft."
+                                    : "Observer/Bidder mode. Waiting for the administrator to finalize coordinates."
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-                        <div className="relative z-10">
-                            <div className="flex items-center justify-between mb-6 sm:mb-10">
-                                <h3 className="text-lg sm:text-2xl font-black italic uppercase tracking-tight flex items-center gap-2 sm:gap-3">
-                                    <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                                    Joined Contenders
-                                </h3>
-                                <span className="text-[10px] sm:text-xs font-black bg-white/5 border border-white/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full opacity-60 uppercase tracking-widest">
-                                    {teams.length} Teams
-                                </span>
+                {/* Center Content */}
+                <div className="lg:col-span-9">
+                    {activeTab === 'players' && (
+                        <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <h3 className="text-xl sm:text-2xl font-black italic uppercase tracking-tight">Draft Assets</h3>
+                                {isAdmin && (
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all"
+                                        >
+                                            <Upload className="w-3 h-3 text-primary" />
+                                            Import
+                                            <input type="file" ref={fileInputRef} onChange={handleExcelUpload} accept=".xlsx, .xls" className="hidden" />
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowAddModal(true)}
+                                            className="bg-primary hover:bg-red-700 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            Manual
+                                        </button>
+                                        <button 
+                                            onClick={() => socket.emit('clear-players', roomId)}
+                                            className="p-2.5 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
+                                            title="Clear List"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-12">
-                                <AnimatePresence mode="popLayout">
-                                    {teams.map((name, i) => (
-                                        <motion.div
-                                            key={name || `team-${i}`}
-                                            initial={{ scale: 0.8, opacity: 0 }}
-                                            animate={{ scale: 1, opacity: 1 }}
-                                            exit={{ scale: 0.8, opacity: 0 }}
-                                            transition={{ delay: i * 0.1 }}
-                                            className="flex flex-col items-center gap-2 sm:gap-4 p-3 sm:p-6 rounded-[20px] sm:rounded-[32px] bg-white/5 border border-white/5 hover:border-primary/20 hover:bg-primary/5 transition-all group/team"
-                                        >
-                                            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center p-1.5 sm:p-2 group-hover/team:scale-110 transition-transform relative">
-                                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`} alt={name} className="w-full h-full object-cover" />
-                                                <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-green-500 w-4 h-4 sm:w-6 sm:h-6 rounded-md sm:rounded-lg flex items-center justify-center shadow-lg border-2 border-[#080d09]">
-                                                    <CheckCircle2 className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {players.map((p, idx) => (
+                                    <motion.div
+                                        key={idx}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="group relative p-4 rounded-3xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all overflow-hidden"
+                                    >
+                                        {isAdmin && (
+                                            <button 
+                                                onClick={() => socket.emit('remove-player', { roomId, playerIndex: idx })}
+                                                className="absolute top-2 right-2 p-2 rounded-lg bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center text-sm font-black italic text-primary">
+                                                {p.ovr || 80}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-black uppercase italic tracking-tight truncate text-sm">{p.name}</h4>
+                                                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">{p.position || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                                            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">Base</span>
+                                            <span className="text-sm font-black italic text-primary">₹{p.basePrice}Cr</span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                                {players.length === 0 && (
+                                    <div className="col-span-full py-20 flex flex-col items-center justify-center text-white/10 border-2 border-dashed border-white/5 rounded-[40px]">
+                                        <FileSpreadsheet className="w-10 h-10 mb-4 opacity-20" />
+                                        <p className="font-black uppercase tracking-widest text-xs italic">Asset Registry Empty</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'teams' && (
+                        <div className="space-y-6">
+                            <h3 className="text-xl sm:text-2xl font-black italic uppercase tracking-tight">Active Contenders</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {Object.keys(roomState.budgets || {}).map((name) => (
+                                    <div key={name} className="p-5 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-between group overflow-hidden relative">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                                                {roomState.adminTeam === name ? <Crown className="w-5 h-5 text-yellow-500" /> : <Users className="w-5 h-5 text-blue-400" />}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black uppercase italic tracking-tight text-sm">{name}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Active</span>
                                                 </div>
                                             </div>
-                                            <div className="text-center">
-                                                <span className="text-[10px] sm:text-sm font-black italic uppercase block truncate w-full max-w-[80px] sm:max-w-none">{name}</span>
-                                                <span className="text-[7px] sm:text-[8px] font-black opacity-30 uppercase tracking-[0.2em] hidden sm:block">Ready to Raid</span>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                    <motion.div
-                                        className="flex flex-col items-center justify-center gap-2 sm:gap-4 p-3 sm:p-6 rounded-[20px] sm:rounded-[32px] border-2 border-dashed border-white/5 opacity-40 hover:opacity-100 transition-all cursor-pointer"
-                                        onClick={copyRoomId}
-                                    >
-                                        <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white/5 flex items-center justify-center border border-white/5">
-                                            <Plus className="w-6 h-6 sm:w-8 sm:h-8 opacity-20" />
                                         </div>
-                                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Invite</span>
-                                    </motion.div>
-                                </AnimatePresence>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                                {isAdmin ? (
-                                    <button
-                                        onClick={onStartAuction}
-                                        className="flex-1 bg-primary hover:bg-red-700 text-white py-4 sm:py-6 rounded-2xl sm:rounded-3xl font-black tracking-[0.2em] uppercase transition-all shadow-xl hover:shadow-primary/30 flex items-center justify-center gap-2 sm:gap-3 group text-sm sm:text-base"
-                                    >
-                                        COMMENCE AUCTION
-                                        <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-2 transition-transform" />
-                                    </button>
-                                ) : (
-                                    <div className="flex-1 bg-white/5 border border-white/10 py-4 sm:py-6 rounded-2xl sm:rounded-3xl font-black tracking-[0.2em] uppercase opacity-40 flex items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm">
-                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                        Awaiting Admin...
+                                        {isAdmin && name !== roomState.adminTeam && (
+                                            <button 
+                                                onClick={() => socket.emit('kick-team', { roomId, teamName: name })}
+                                                className="p-2.5 rounded-xl bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                                            >
+                                                <UserMinus className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
-                                )}
-                                <button
-                                    onClick={copyRoomId}
-                                    className="sm:px-10 bg-white/5 border border-white/10 hover:bg-white/10 text-white py-4 sm:py-6 rounded-2xl sm:rounded-3xl font-black tracking-widest uppercase transition-all flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm"
-                                >
-                                    <Copy className="w-4 h-4 sm:w-5 sm:h-5 opacity-40" />
-                                    Copy Link
-                                </button>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                </div>
+                    )}
 
-                {/* Right Side: Player List & Admin Config */}
-                <div className="xl:col-span-4 space-y-4 sm:space-y-6 w-full">
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="bg-surface-dark/40 backdrop-blur-3xl border border-white/5 rounded-[32px] sm:rounded-[40px] p-5 sm:p-8 shadow-2xl"
-                    >
-                        <div className="flex items-center gap-2 sm:gap-3 mb-6 sm:mb-8">
-                            <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                            <h4 className="text-lg sm:text-xl font-black italic uppercase tracking-tight">Roster Status</h4>
-                        </div>
+                    {activeTab === 'settings' && (
+                        <div className="space-y-6">
+                            <h3 className="text-xl sm:text-2xl font-black italic uppercase tracking-tight">Arena Configuration</h3>
+                            {isAdmin ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="p-6 rounded-[32px] bg-white/5 border border-white/5 space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center"><Settings className="w-4 h-4 text-primary" /></div>
+                                            <h4 className="text-[11px] font-black uppercase tracking-widest">Financial Protocol</h4>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[9px] font-black text-white/20 uppercase tracking-widest block mb-2 px-1">Initial Cap (Cr)</label>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        type="number" 
+                                                        value={roomState.globalSettings?.initialBudget || 100}
+                                                        onChange={(e) => socket.emit('update-config', { roomId, config: { initialBudget: parseFloat(e.target.value) || 0 }})}
+                                                        className="flex-1 bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 focus:bg-black/60 transition-all"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex gap-3 italic">
+                                                <div className="mt-1"><Info className="w-3 h-3 text-yellow-500" /></div>
+                                                <p className="text-[9px] text-white/40 leading-relaxed uppercase tracking-widest">Note: Synchronizes all team wallets to the new cap instantly.</p>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                        <div className="space-y-6 sm:space-y-8">
-                            {isAdmin && (
-                                <div className="p-4 sm:p-6 bg-white/5 rounded-2xl sm:rounded-3xl border border-white/5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-black opacity-40 uppercase tracking-[0.2em]">Global Asset Budget</span>
-                                        <span className="text-primary font-black italic">${roomState?.globalSettings.initialBudget || 100}M</span>
+                                    <div className="p-6 rounded-[32px] bg-white/5 border border-white/5 space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center"><Plus className="w-4 h-4 text-blue-400" /></div>
+                                            <h4 className="text-[11px] font-black uppercase tracking-widest">Neural Presets</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            <button 
+                                                onClick={() => socket.emit('load-preset', { roomId, presetType: 'cricket' })}
+                                                className="w-full p-4 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/30 text-left transition-all group"
+                                            >
+                                                <p className="text-[10px] font-black uppercase italic group-hover:text-blue-400 transition-colors">IPL Arena 2026</p>
+                                                <p className="text-[8px] opacity-30 mt-1 uppercase tracking-[0.2em]">Mega Auction Roster</p>
+                                            </button>
+                                            <button 
+                                                onClick={() => socket.emit('load-preset', { roomId, presetType: 'football' })}
+                                                className="w-full p-4 rounded-xl bg-white/5 border border-white/5 hover:border-green-500/30 text-left transition-all group"
+                                            >
+                                                <p className="text-[10px] font-black uppercase italic group-hover:text-green-500 transition-colors">Pro League Draft</p>
+                                                <p className="text-[8px] opacity-30 mt-1 uppercase tracking-[0.2em]">Global Elite Pool</p>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="range"
-                                        min="50"
-                                        max="1000"
-                                        step="10"
-                                        defaultValue={roomState?.globalSettings.initialBudget || 100}
-                                        onMouseUp={(e) => {
-                                            const val = parseInt(e.target.value);
-                                            socket.emit('update-config', { roomId, config: { initialBudget: val } });
-                                        }}
-                                        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
-                                    />
-                                    <div className="flex justify-between mt-2 text-[8px] font-black opacity-20 uppercase">
-                                        <span>$50M</span>
-                                        <span>$1000M</span>
-                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-20 flex flex-col items-center justify-center text-center opacity-20 italic">
+                                    <Shield className="w-12 h-12 mb-4" />
+                                    <p className="font-black uppercase tracking-[0.3em] text-xs">Read-Only Mode</p>
                                 </div>
                             )}
-
-                            <div className="space-y-3 sm:space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black opacity-40 uppercase tracking-[0.2em]">Roster Registry</span>
-                                    <span className="text-[10px] font-black text-primary uppercase">{roomState?.players.length || 0} Assets</span>
-                                </div>
-
-                                <div className="max-h-48 sm:max-h-56 overflow-y-auto bg-black/40 rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-white/5 custom-scrollbar space-y-2">
-                                    {roomState?.players.map((p, i) => (
-                                        <div key={`${p.name}-${i}`} className="flex justify-between items-center py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-white/5 border border-white/5 group/player">
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-xs font-bold truncate">{p.name}</span>
-                                                <span className="text-[10px] font-black text-primary italic">${p.basePrice}M</span>
-                                            </div>
-                                            {isAdmin && (
-                                                <button
-                                                    onClick={() => {
-                                                        // console.log('Client: Emitting remove-player', { roomId, playerIndex: i });
-                                                        socket.emit('remove-player', { roomId, playerIndex: i });
-                                                    }}
-                                                    className="p-1.5 sm:p-2 opacity-20 hover:opacity-100 hover:bg-red-500/20 text-red-500 transition-all rounded-lg flex-shrink-0 ml-2"
-                                                    title="Remove Player"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    )) || <div className="py-8 sm:py-10 text-center opacity-20 italic text-xs">Registry Empty</div>}
-                                </div>
-
-                                {isAdmin && (
-                                    <>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => socket.emit('load-preset', { roomId, presetType: 'cricket' })}
-                                                className="text-[10px] bg-white/5 border border-white/10 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl hover:bg-blue-500/20 hover:text-blue-400 hover:border-blue-500/30 transition-all font-black uppercase tracking-widest"
-                                            >
-                                                Cricket
-                                            </button>
-                                            <button
-                                                onClick={() => socket.emit('load-preset', { roomId, presetType: 'football' })}
-                                                className="text-[10px] bg-white/5 border border-white/10 text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all font-black uppercase tracking-widest"
-                                            >
-                                                Football
-                                            </button>
-                                        </div>
-
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            onChange={handleExcelUpload}
-                                            accept=".xlsx, .xls"
-                                            className="hidden"
-                                        />
-                                        <button
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="w-full flex items-center justify-center gap-2 text-[10px] bg-primary/10 border border-primary/20 text-primary px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl hover:bg-primary/20 transition-all font-black uppercase tracking-widest"
-                                        >
-                                            <FileUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                            Upload Excel Registry
-                                        </button>
-
-                                        <button
-                                            onClick={() => socket.emit('clear-players', roomId)}
-                                            className="w-full text-[10px] bg-red-500/5 text-red-500/40 hover:text-red-500 px-4 py-2 rounded-xl sm:rounded-2xl hover:bg-red-500/10 transition-all font-black uppercase tracking-widest"
-                                        >
-                                            Purge Registry
-                                        </button>
-
-                                        <div className="p-4 sm:p-6 bg-white/5 rounded-2xl sm:rounded-3xl border border-white/5 space-y-3 sm:space-y-4">
-                                            <span className="text-[10px] font-black opacity-40 uppercase tracking-[0.2em] block">Manual Asset Entry</span>
-                                            <div className="flex gap-2">
-                                                <textarea
-                                                    id="lobby-player-name"
-                                                    rows={1}
-                                                    placeholder="Identity (paste multiple on new lines)"
-                                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all min-w-0 resize-y max-h-32 min-h-[42px]"
-                                                />
-                                                <input
-                                                    id="lobby-player-price"
-                                                    type="number"
-                                                    placeholder="$$$"
-                                                    className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-xl px-2 sm:px-4 py-2.5 sm:py-3 text-xs outline-none focus:border-primary transition-all h-[42px]"
-                                                />
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    const nameValue = document.getElementById('lobby-player-name').value;
-                                                    const price = parseFloat(document.getElementById('lobby-player-price').value);
-                                                    if (nameValue && !isNaN(price)) {
-                                                        const names = nameValue.split('\n').filter(n => n.trim().length > 0);
-                                                        names.forEach(name => {
-                                                            socket.emit('add-player', { roomId, player: { name: name.trim(), basePrice: price } });
-                                                        });
-                                                        document.getElementById('lobby-player-name').value = '';
-                                                        document.getElementById('lobby-player-price').value = '';
-                                                        showNotification(`Added ${names.length} player(s) to registry!`, 'success');
-                                                    } else {
-                                                        showNotification('Please provide valid Identity and Price', 'error');
-                                                    }
-                                                }}
-                                                className="w-full bg-primary/20 text-primary border border-primary/30 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-primary hover:text-white transition-all shadow-lg hover:shadow-primary/20"
-                                            >
-                                                Add to Registry
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
                         </div>
-                    </motion.div>
-
-                    <div className="p-4 sm:p-6 opacity-20 text-center">
-                        <p className="text-[8px] font-black uppercase tracking-[0.3em]">Neural Link Stable • {isAdmin ? 'Admin Priority 01' : 'Observer Mode Active'}</p>
-                    </div>
+                    )}
                 </div>
-            </div>
+            </main>
 
-            <footer className="mt-10 sm:mt-16 flex flex-wrap justify-center gap-4 sm:gap-10 opacity-20 text-[10px] font-black uppercase tracking-[0.5em]">
-                <span>Neural Stream Validated</span>
-                <span>Encrypted Arena</span>
-                <span>v4.2.1-PRO</span>
-            </footer>
+            {/* Manual Add Modal */}
+            <AnimatePresence>
+                {showAddModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setShowAddModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-3xl" />
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            className="relative w-full max-w-md bg-[#0e120f] border border-white/10 rounded-[32px] p-6 sm:p-8 shadow-2xl"
+                        >
+                            <h3 className="text-2xl font-black italic uppercase tracking-tight mb-6">Register Asset</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-2 px-1">Asset Identity</label>
+                                    <input type="text" placeholder="e.g. MS Dhoni" value={newPlayer.name}
+                                        onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 transition-all"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-2 px-1">Price (Cr)</label>
+                                        <input type="number" placeholder="2.0" value={newPlayer.basePrice}
+                                            onChange={(e) => setNewPlayer({ ...newPlayer, basePrice: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-2 px-1">OVR</label>
+                                        <input type="number" placeholder="90" value={newPlayer.ovr}
+                                            onChange={(e) => setNewPlayer({ ...newPlayer, ovr: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 transition-all"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-2 px-1">Position</label>
+                                    <input type="text" placeholder="WK-Batter" value={newPlayer.position}
+                                        onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-white/30 uppercase tracking-widest block mb-2 px-1">Profile Photo URL</label>
+                                    <input type="text" placeholder="https://..." value={newPlayer.image}
+                                        onChange={(e) => setNewPlayer({ ...newPlayer, image: e.target.value })}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white font-bold outline-none focus:border-primary/40 transition-all text-xs"
+                                    />
+                                </div>
+                                <button onClick={handleAddPlayer} className="w-full bg-primary hover:bg-red-700 py-4 rounded-2xl font-black uppercase text-sm shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] mt-2">
+                                    Inject into Roster
+                                </button>
+                                <button onClick={() => setShowAddModal(false)} className="w-full bg-white/5 hover:bg-white/10 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all">
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

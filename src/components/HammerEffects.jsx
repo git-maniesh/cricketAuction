@@ -1,89 +1,118 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
-import { Gavel } from 'lucide-react';
+import { Gavel, AlertCircle, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 
 const HammerEffects = ({ show, onComplete, type = 'SOLD' }) => {
     const hammerRef = useRef(null);
     const overlayRef = useRef(null);
-    const audioRef = useRef(null);
 
     useEffect(() => {
         if (show) {
             const tl = gsap.timeline({
                 onComplete: () => {
-                    setTimeout(onComplete, 1000);
+                    setTimeout(onComplete, 800);
                 }
             });
 
-            // Initial state: Hammer high and rotated
+            // Initial state: Off-screen or scaled
             gsap.set(hammerRef.current, {
-                y: -500,
-                rotate: -45,
-                scale: 2,
+                y: type === 'CLOSING' ? 100 : -200,
+                rotate: type === 'CLOSING' ? 0 : -30,
+                scale: 0.5,
                 opacity: 0,
-                filter: 'blur(10px)'
+                filter: 'blur(20px)'
             });
 
             tl.to(overlayRef.current, {
                 opacity: 1,
                 duration: 0.2,
-                ease: "power2.out"
             })
-                .to(hammerRef.current, {
-                    opacity: 1,
-                    y: 0,
-                    rotate: 0,
-                    scale: 1,
-                    filter: 'blur(0px)',
-                    duration: 0.4,
-                    ease: "back.in(1.7)"
-                })
-                // Slam impact shake
-                .to(hammerRef.current, {
-                    y: 20,
-                    duration: 0.05,
-                    repeat: 1,
-                    yoyo: true
+            .to(hammerRef.current, {
+                opacity: 1,
+                y: 0,
+                rotate: 0,
+                scale: 1,
+                filter: 'blur(0px)',
+                duration: 0.5,
+                ease: "back.out(1.7)"
+            });
+
+            if (type === 'SOLD' || type === 'UNSOLD') {
+                tl.to(hammerRef.current, {
+                    scale: 1.1,
+                    duration: 0.1,
+                    yoyo: true,
+                    repeat: 1
                 })
                 .to('body', {
-                    x: 10,
+                    x: 5,
                     duration: 0.05,
-                    repeat: 3,
-                    yoyo: true,
-                    ease: "power2.inOut"
-                }, "-=0.1")
-                .to(overlayRef.current, {
-                    opacity: 0,
-                    duration: 0.5,
-                    delay: 1,
-                    ease: "power2.in"
-                });
+                    repeat: 5,
+                    yoyo: true
+                }, "-=0.1");
+            }
+
+            tl.to(overlayRef.current, {
+                opacity: 0,
+                duration: 0.4,
+                delay: 1.2,
+            });
         }
-    }, [show, onComplete]);
+    }, [show, onComplete, type]);
 
     if (!show) return null;
 
-    return (
-        <div
-            ref={overlayRef}
-            className="fixed bottom-10 right-10 z-[300] flex items-center justify-center pointer-events-none opacity-0"
-        >
-            <div className="relative group">
-                {/* Glow effect */}
-                <div className="absolute inset-0 bg-primary/40 rounded-full blur-[20px] animate-pulse" />
+    const config = {
+        SOLD: { 
+            icon: <CheckCircle2 className="w-10 h-10 text-green-500" />, 
+            text: "SOLD!", 
+            sub: "ASSET ACQUIRED", 
+            color: "border-green-500/50 shadow-green-500/20",
+            glow: "bg-green-500/20"
+        },
+        UNSOLD: { 
+            icon: <XCircle className="w-10 h-10 text-red-500" />, 
+            text: "UNSOLD", 
+            sub: "RETURNED TO ROSTER", 
+            color: "border-red-500/50 shadow-red-500/20",
+            glow: "bg-red-500/20"
+        },
+        CLOSING: { 
+            icon: <AlertCircle className="w-10 h-10 text-yellow-500 animate-pulse" />, 
+            text: "CLOSING!", 
+            sub: "HAMMER FALLING", 
+            color: "border-yellow-500/50 shadow-yellow-500/20",
+            glow: "bg-yellow-500/20"
+        },
+        OPEN: { 
+            icon: <Sparkles className="w-10 h-10 text-primary animate-spin" />, 
+            text: "ACTION!", 
+            sub: "MARKET OPEN", 
+            color: "border-primary/50 shadow-primary/20",
+            glow: "bg-primary/20"
+        }
+    }[type] || { 
+        icon: <Gavel className="w-10 h-10 text-primary" />, 
+        text: "AUCTION", 
+        sub: "SYNCHRONIZED", 
+        color: "border-primary/50 shadow-primary/20",
+        glow: "bg-primary/20"
+    };
 
-                <div ref={hammerRef} className="relative z-10 flex flex-row items-center gap-4 bg-surface-dark/90 backdrop-blur-md p-4 pr-8 rounded-3xl border border-primary/50 shadow-[0_0_50px_rgba(234,42,51,0.5)]">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/50 border-2 border-primary rounded-2xl flex items-center justify-center shadow-inner">
-                        <Gavel className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
-                    </div>
-                    <div className="text-left">
-                        <h1 className="text-2xl sm:text-3xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_15px_rgba(234,42,51,0.8)]">
-                            {type === 'SOLD' ? 'SOLD!' : type === 'UNSOLD' ? 'UNSOLD' : type === 'CLOSING' ? 'FINAL CALL' : 'ACTION!'}
-                        </h1>
-                        <p className="text-primary font-black uppercase tracking-[0.2em] mt-1 text-[8px] sm:text-[10px] animate-pulse">
-                            {type === 'SOLD' ? 'Acquired' : type === 'UNSOLD' ? 'Next Asset' : type === 'CLOSING' ? 'Hammer Falling' : 'Open'}
-                        </p>
-                    </div>
+    return (
+        <div ref={overlayRef} className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none bg-black/20 backdrop-blur-[2px] opacity-0">
+            <div ref={hammerRef} className={`relative flex items-center gap-6 bg-black/80 backdrop-blur-2xl px-10 py-6 rounded-[32px] border ${config.color} shadow-2xl`}>
+                <div className={`absolute inset-0 ${config.glow} blur-[50px] -z-10 rounded-full`} />
+                <div className="w-20 h-20 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                    {config.icon}
+                </div>
+                <div className="flex flex-col">
+                    <h1 className="text-5xl font-black italic uppercase tracking-tighter text-white leading-none">
+                        {config.text}
+                    </h1>
+                    <p className="text-xs font-black uppercase tracking-[0.4em] opacity-40 mt-2">
+                        {config.sub}
+                    </p>
                 </div>
             </div>
         </div>

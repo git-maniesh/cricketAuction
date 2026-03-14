@@ -57,7 +57,7 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -65,6 +65,38 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #1b3321;
+  background: rgba(234, 42, 51, 0.3);
   border-radius: 10px;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.neon-glow {
+  box-shadow: 0 0 20px rgba(234, 42, 51, 0.2);
+}
+
+.shadow-glow {
+  filter: drop-shadow(0 0 8px rgba(234, 42, 51, 0.6));
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
