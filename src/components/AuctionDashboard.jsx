@@ -87,6 +87,7 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
     const [unreadMessages, setUnreadMessages] = useState(0);
     const [editingPlayer, setEditingPlayer] = useState(null); // { team, index, name, price }
     const [transferringPlayer, setTransferringPlayer] = useState(null); // { team, index }
+    const [addingToTeam, setAddingToTeam] = useState(null); // teamName
     const [notification, setNotification] = useState(null);
     const fileInputRef = useRef(null);
     const sidebarEndRef = useRef(null);
@@ -411,16 +412,80 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
                                         {roomState?.players.map((p, i) => {
                                             const isSold = Object.values(roomState.squads || {}).some(s => s.some(sp => sp.name === p.name));
                                             return (
-                                                <div key={i} className={`p-4 rounded-3xl border transition-all ${i === roomState.currentPlayerIndex ? 'bg-primary/10 border-primary/40' : isSold ? 'bg-green-500/5 border-green-500/10 opacity-60' : 'bg-white/5 border-white/5'}`}>
+                                                <div key={i} className={`p-4 rounded-3xl border transition-all relative group ${i === roomState.currentPlayerIndex ? 'bg-primary/10 border-primary/40' : isSold ? 'bg-green-500/5 border-green-500/10 opacity-60' : 'bg-white/5 border-white/5'}`}>
                                                     <div className="flex gap-4 items-center">
                                                         <div className="w-12 h-14 bg-black/40 rounded-xl flex items-center justify-center text-primary font-black italic border border-white/5">{p.ovr || 80}</div>
-                                                        <div className="min-w-0">
-                                                            <h4 className="text-xs font-black italic uppercase truncate">{p.name}</h4>
-                                                            <p className="text-[8px] opacity-30 font-bold uppercase">{p.position}</p>
-                                                            {isSold && <p className="text-[8px] text-green-500 font-black mt-1 italic uppercase tracking-widest">Secured</p>}
-                                                            {i === roomState.currentPlayerIndex && <p className="text-[8px] text-primary font-black mt-1 italic uppercase tracking-widest animate-pulse">Live</p>}
+                                                        <div className="min-w-0 flex-1">
+                                                            {editingPlayer?.isMarketplace && editingPlayer?.index === i ? (
+                                                                <div className="space-y-1">
+                                                                    <input 
+                                                                        className="w-full bg-white/5 border border-white/20 rounded px-2 py-1 text-[10px] outline-none"
+                                                                        value={editingPlayer.name}
+                                                                        onChange={e => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
+                                                                    />
+                                                                    <div className="grid grid-cols-2 gap-1">
+                                                                        <input 
+                                                                            type="number"
+                                                                            className="w-full bg-white/5 border border-white/20 rounded px-2 py-1 text-[10px] outline-none"
+                                                                            value={editingPlayer.ovr}
+                                                                            onChange={e => setEditingPlayer({ ...editingPlayer, ovr: e.target.value })}
+                                                                        />
+                                                                        <input 
+                                                                            type="number" step="0.1"
+                                                                            className="w-full bg-white/5 border border-white/20 rounded px-2 py-1 text-[10px] outline-none"
+                                                                            value={editingPlayer.price}
+                                                                            onChange={e => setEditingPlayer({ ...editingPlayer, price: e.target.value })}
+                                                                        />
+                                                                    </div>
+                                                                    <input 
+                                                                        className="w-full bg-white/5 border border-white/20 rounded px-2 py-1 text-[10px] outline-none"
+                                                                        placeholder="Position"
+                                                                        value={editingPlayer.position}
+                                                                        onChange={e => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
+                                                                    />
+                                                                    <div className="flex gap-1">
+                                                                        <button onClick={() => {
+                                                                            socket.emit('admin-update-marketplace-player', {
+                                                                                roomId, playerIndex: i,
+                                                                                updatedData: { 
+                                                                                    name: editingPlayer.name, 
+                                                                                    ovr: parseInt(editingPlayer.ovr), 
+                                                                                    basePrice: parseFloat(editingPlayer.price),
+                                                                                    position: editingPlayer.position 
+                                                                                }
+                                                                            });
+                                                                            setEditingPlayer(null);
+                                                                        }} className="flex-1 bg-primary py-1 rounded text-[9px] font-bold">Save</button>
+                                                                        <button onClick={() => setEditingPlayer(null)} className="flex-1 bg-white/10 py-1 rounded text-[9px] font-bold">X</button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <h4 className="text-xs font-black italic uppercase truncate">{p.name}</h4>
+                                                                    <p className="text-[8px] opacity-30 font-bold uppercase">{p.position}</p>
+                                                                    {isSold && <p className="text-[8px] text-green-500 font-black mt-1 italic uppercase tracking-widest">Secured</p>}
+                                                                    {i === roomState.currentPlayerIndex && <p className="text-[8px] text-primary font-black mt-1 italic uppercase tracking-widest animate-pulse">Live</p>}
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
+                                                    {isAdmin && !editingPlayer && !isSold && (
+                                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button 
+                                                                onClick={() => setEditingPlayer({ 
+                                                                    isMarketplace: true, 
+                                                                    index: i, 
+                                                                    name: p.name, 
+                                                                    price: p.basePrice, 
+                                                                    ovr: p.ovr || 80, 
+                                                                    position: p.position 
+                                                                })}
+                                                                className="p-1 bg-white/10 rounded hover:bg-primary transition-colors"
+                                                            >
+                                                                <Edit className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -538,19 +603,70 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                                 {Object.keys(roomState?.budgets || {}).map(team => (
                                                     <div key={team} className="p-5 rounded-2xl bg-black/40 border border-white/5 flex items-center justify-between">
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs font-black uppercase truncate">{team}</p>
-                                                            <p className="text-[9px] text-primary italic font-black">{formatPrice(roomState.budgets[team])}</p>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            {team !== user.teamName && (
-                                                                <button onClick={() => socket.emit('kick-team', { roomId, teamName: team })} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all">
-                                                                    <XCircle className="w-4 h-4" />
-                                                                </button>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-black uppercase truncate">{team}</p>
+                                                                    <p className="text-[9px] text-primary italic font-black">{formatPrice(roomState.budgets[team])}</p>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button onClick={() => setAddingToTeam(addingToTeam === team ? null : team)} className={`p-2 rounded-lg transition-all ${addingToTeam === team ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white'}`}>
+                                                                        <Plus className="w-4 h-4" />
+                                                                    </button>
+                                                                    {team !== user.teamName && (
+                                                                        <button onClick={() => socket.emit('kick-team', { roomId, teamName: team })} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                                                                            <XCircle className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                    <button onClick={() => socket.emit('transfer-admin', { roomId, teamName: team })} className={`p-2 rounded-lg transition-all ${roomState?.adminTeam === team ? 'bg-primary text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
+                                                                        <ShieldCheck className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {addingToTeam === team && (
+                                                                <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+                                                                    <input 
+                                                                        id={`add-player-name-${team}`}
+                                                                        placeholder="Player Name"
+                                                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] outline-none"
+                                                                    />
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <input 
+                                                                            id={`add-player-ovr-${team}`}
+                                                                            type="number" placeholder="OVR"
+                                                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] outline-none"
+                                                                        />
+                                                                        <input 
+                                                                            id={`add-player-price-${team}`}
+                                                                            type="number" step="0.1" placeholder="Price (Cr)"
+                                                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <input 
+                                                                        id={`add-player-pos-${team}`}
+                                                                        placeholder="Position"
+                                                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[10px] outline-none"
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const name = document.getElementById(`add-player-name-${team}`).value;
+                                                                            const ovr = document.getElementById(`add-player-ovr-${team}`).value;
+                                                                            const price = document.getElementById(`add-player-price-${team}`).value;
+                                                                            const pos = document.getElementById(`add-player-pos-${team}`).value;
+                                                                            if(!name || !price) return;
+                                                                            socket.emit('admin-add-to-squad', {
+                                                                                roomId, teamName: team,
+                                                                                playerData: { name, ovr, boughtPrice: price, position: pos }
+                                                                            });
+                                                                            setAddingToTeam(null);
+                                                                        }}
+                                                                        className="w-full bg-green-500 py-2 rounded-lg text-white text-[9px] font-black uppercase"
+                                                                    >
+                                                                        Inject Player
+                                                                    </button>
+                                                                </div>
                                                             )}
-                                                            <button onClick={() => socket.emit('transfer-admin', { roomId, teamName: team })} className={`p-2 rounded-lg transition-all ${roomState?.adminTeam === team ? 'bg-primary text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
-                                                                <ShieldCheck className="w-4 h-4" />
-                                                            </button>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -580,6 +696,20 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
                                                                                         value={editingPlayer.name}
                                                                                         onChange={e => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
                                                                                     />
+                                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                                        <input
+                                                                                            type="number" placeholder="OVR"
+                                                                                            className="w-full bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-[11px] outline-none focus:border-primary"
+                                                                                            value={editingPlayer.ovr}
+                                                                                            onChange={e => setEditingPlayer({ ...editingPlayer, ovr: e.target.value })}
+                                                                                        />
+                                                                                        <input
+                                                                                            placeholder="Position"
+                                                                                            className="w-full bg-white/5 border border-white/20 rounded-lg px-3 py-2 text-[11px] outline-none focus:border-primary"
+                                                                                            value={editingPlayer.position}
+                                                                                            onChange={e => setEditingPlayer({ ...editingPlayer, position: e.target.value })}
+                                                                                        />
+                                                                                    </div>
                                                                                     <div className="flex items-center gap-2">
                                                                                         <input
                                                                                             type="number" step="0.1"
@@ -590,7 +720,13 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
                                                                                         <button onClick={() => {
                                                                                             socket.emit('admin-update-squad-player', {
                                                                                                 roomId, teamName, playerIndex: pIdx,
-                                                                                                updatedData: { name: editingPlayer.name, boughtPrice: editingPlayer.price }
+                                                                                                                                                                                                 updatedData: { 
+                                                                                                    name: editingPlayer.name, 
+                                                                                                    boughtPrice: editingPlayer.price,
+                                                                                                    ovr: parseInt(editingPlayer.ovr),
+                                                                                                    position: editingPlayer.position
+                                                                                                 }
+
                                                                                             });
                                                                                             setEditingPlayer(null);
                                                                                         }} className="p-2 bg-primary rounded-lg text-white"><Save className="w-4 h-4" /></button>
@@ -607,7 +743,14 @@ const AuctionDashboard = ({ roomId, user, socket, isAdmin, roomState, onExit }) 
                                                                         {!editingPlayer && (
                                                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                                 <button
-                                                                                    onClick={() => setEditingPlayer({ team: teamName, index: pIdx, name: player.name, price: player.boughtPrice })}
+                                                                                    onClick={() => setEditingPlayer({ 
+                                                                                        team: teamName, 
+                                                                                        index: pIdx, 
+                                                                                        name: player.name, 
+                                                                                        price: player.boughtPrice,
+                                                                                        ovr: player.ovr || 80,
+                                                                                        position: player.position || 'N/A'
+                                                                                     })}
                                                                                     className="p-1.5 bg-white/5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                                                                                 >
                                                                                     <Edit className="w-3.5 h-3.5" />

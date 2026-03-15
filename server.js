@@ -44,9 +44,9 @@ const dirtyRooms = new Set();
 
 // ─── Mongoose Schemas ──────────────────────────────────────
 const roomSchema = new mongoose.Schema({
-    roomId:    { type: String, required: true, unique: true, index: true },
+    roomId: { type: String, required: true, unique: true, index: true },
     adminTeam: { type: String, required: true },
-    data:      { type: mongoose.Schema.Types.Mixed, required: true },
+    data: { type: mongoose.Schema.Types.Mixed, required: true },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
@@ -63,8 +63,35 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/auctionDB',
     console.log('✅ Connected to MongoDB');
     try {
         const existingRooms = await RoomModel.find({});
-        existingRooms.forEach(doc => rooms.set(doc.roomId, doc.data));
-        console.log(`📦 Loaded ${existingRooms.length} room(s) from database`);
+        existingRooms.forEach(doc => {
+            const data = doc.data;
+            // Migration: Update player images to Cricbuzz
+            const idMap = {
+                'Virat Kohli': 1413, 'MS Dhoni': 265, 'Jasprit Bumrah': 9311, 'Rohit Sharma': 576,
+                'Steve Smith': 2250, 'Kane Williamson': 1610, 'Joe Root': 8019, 'Babar Azam': 8359,
+                'Rashid Khan': 10738, 'Hardik Pandya': 9608, 'Pat Cummins': 8095, 'Mitchell Starc': 8143,
+                'Suryakumar Yadav': 7915, 'Quinton de Kock': 8356, 'Shubman Gill': 11813,
+                'Mohammed Shami': 7909, 'Ravindra Jadeja': 587, 'Rishabh Pant': 10744,
+                'Sam Curran': 12224, 'Trent Boult': 8117
+            };
+
+            const migrate = (p) => {
+                if (p && idMap[p.name] && (!p.image || p.image.includes('hscicdn'))) {
+                    p.image = `https://www.cricbuzz.com/stats/img/face/${idMap[p.name]}.jpg`;
+                }
+                return p;
+            };
+
+            if (data.players) data.players = data.players.map(migrate);
+            if (data.squads) {
+                Object.keys(data.squads).forEach(team => {
+                    data.squads[team] = data.squads[team].map(migrate);
+                });
+            }
+
+            rooms.set(doc.roomId, data);
+        });
+        console.log(`📦 Loaded and Migrated ${existingRooms.length} room(s) from database`);
     } catch (err) {
         console.error('❌ Error loading rooms from DB:', err.message);
     }
@@ -101,36 +128,37 @@ setInterval(async () => {
 
 // ─── Presets ───────────────────────────────────────────────
 const CRICKET_PLAYERS = [
-    { name: 'Virat Kohli',     basePrice: 20.0, ovr: 92, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316605.png', badges: ['King', 'Chase Master', 'Legend'], stats: [{ label: 'VAL', value: 92 }] },
-    { name: 'MS Dhoni',        basePrice: 15.0, ovr: 89, position: 'WK-Batter', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/319900/319946.png', badges: ['Captain Cool', 'Finisher'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Jasprit Bumrah',  basePrice: 15.0, ovr: 91, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316625.png', badges: ['Yorker King', 'Elite'], stats: [{ label: 'VAL', value: 91 }] },
-    { name: 'Rohit Sharma',    basePrice: 18.0, ovr: 90, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316500/316584.png', badges: ['Hitman', 'Leader'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Steve Smith',     basePrice: 12.0, ovr: 89, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/313800/313898.png', badges: ['Technician', 'Wall'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Kane Williamson', basePrice: 12.0, ovr: 88, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/301200/301217.png', badges: ['Maestro', 'Composed'], stats: [{ label: 'VAL', value: 88 }] },
-    { name: 'Joe Root',        basePrice: 12.0, ovr: 89, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316400/316486.png', badges: ['Class', 'Stable'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Babar Azam',      basePrice: 15.0, ovr: 89, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/322300/322359.png', badges: ['Artist', 'Elegant'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Rashid Khan',     basePrice: 15.0, ovr: 90, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/321800/321864.png', badges: ['Magician', 'X-Factor'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Hardik Pandya',   basePrice: 12.0, ovr: 89, position: 'All-Rounder', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316616.png', badges: ['Clutch', 'Power'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Pat Cummins',     basePrice: 15.0, ovr: 90, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/320400/320448.png', badges: ['Captain', 'Pace'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Mitchell Starc',  basePrice: 14.0, ovr: 89, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/320400/320456.png', badges: ['Spearhead', 'Speed'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Suryakumar Yadav', basePrice: 10.0, ovr: 90, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316610.png', badges: ['360°', 'Dynamic'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Quinton de Kock', basePrice: 10.0, ovr: 88, position: 'WK-Batter', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316611.png', badges: ['Flash', 'Aggressor'], stats: [{ label: 'VAL', value: 88 }] },
-    { name: 'Shubman Gill',    basePrice: 12.0, ovr: 88, position: 'Batter',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316620.png', badges: ['Prince', 'Future'], stats: [{ label: 'VAL', value: 88 }] },
-    { name: 'Mohammed Shami',  basePrice: 10.0, ovr: 89, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316630.png', badges: ['Seam Pro', 'Lethal'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Ravindra Jadeja', basePrice: 12.0, ovr: 89, position: 'All-Rounder', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316612.png', badges: ['Rocket Arm', 'Maverick'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Rishabh Pant',    basePrice: 12.0, ovr: 88, position: 'WK-Batter', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/316600/316658.png', badges: ['Instinctive', 'Fearless'], stats: [{ label: 'VAL', value: 88 }] },
-    { name: 'Sam Curran',      basePrice: 10.0, ovr: 87, position: 'All-Rounder', image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/319900/319932.png', badges: ['Pocket Dynamo', 'Utility'], stats: [{ label: 'VAL', value: 87 }] },
-    { name: 'Trent Boult',     basePrice: 12.0, ovr: 89, position: 'Bowler',    image: 'https://img1.hscicdn.com/image/upload/f_auto,t_ds_square_w_800/lsci/db/PICTURES/CMS/320400/320464.png', badges: ['Swinger', 'Strike'], stats: [{ label: 'VAL', value: 89 }] }
+    { name: 'Virat Kohli', basePrice: 20.0, ovr: 92, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/1413.jpg', badges: ['King', 'Chase Master', 'Legend'], stats: [{ label: 'VAL', value: 92 }] },
+    { name: 'MS Dhoni', basePrice: 15.0, ovr: 89, position: 'WK-Batter', image: 'https://www.cricbuzz.com/stats/img/face/265.jpg', badges: ['Captain Cool', 'Finisher'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Jasprit Bumrah', basePrice: 15.0, ovr: 91, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/9311.jpg', badges: ['Yorker King', 'Elite'], stats: [{ label: 'VAL', value: 91 }] },
+    { name: 'Rohit Sharma', basePrice: 18.0, ovr: 90, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/576.jpg', badges: ['Hitman', 'Leader'], stats: [{ label: 'VAL', value: 90 }] },
+    { name: 'Steve Smith', basePrice: 12.0, ovr: 89, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/2250.jpg', badges: ['Technician', 'Wall'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Kane Williamson', basePrice: 12.0, ovr: 88, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/1610.jpg', badges: ['Maestro', 'Composed'], stats: [{ label: 'VAL', value: 88 }] },
+    { name: 'Joe Root', basePrice: 12.0, ovr: 89, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/8019.jpg', badges: ['Class', 'Stable'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Babar Azam', basePrice: 15.0, ovr: 89, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/8359.jpg', badges: ['Artist', 'Elegant'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Rashid Khan', basePrice: 15.0, ovr: 90, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/10738.jpg', badges: ['Magician', 'X-Factor'], stats: [{ label: 'VAL', value: 90 }] },
+    { name: 'Hardik Pandya', basePrice: 12.0, ovr: 89, position: 'All-Rounder', image: 'https://www.cricbuzz.com/stats/img/face/9608.jpg', badges: ['Clutch', 'Power'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Pat Cummins', basePrice: 15.0, ovr: 90, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/8095.jpg', badges: ['Captain', 'Pace'], stats: [{ label: 'VAL', value: 90 }] },
+    { name: 'Mitchell Starc', basePrice: 14.0, ovr: 89, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/8143.jpg', badges: ['Spearhead', 'Speed'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Suryakumar Yadav', basePrice: 10.0, ovr: 90, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/7915.jpg', badges: ['360°', 'Dynamic'], stats: [{ label: 'VAL', value: 90 }] },
+    { name: 'Quinton de Kock', basePrice: 10.0, ovr: 88, position: 'WK-Batter', image: 'https://www.cricbuzz.com/stats/img/face/8356.jpg', badges: ['Flash', 'Aggressor'], stats: [{ label: 'VAL', value: 88 }] },
+    { name: 'Shubman Gill', basePrice: 12.0, ovr: 88, position: 'Batter', image: 'https://www.cricbuzz.com/stats/img/face/11813.jpg', badges: ['Prince', 'Future'], stats: [{ label: 'VAL', value: 88 }] },
+    { name: 'Mohammed Shami', basePrice: 10.0, ovr: 89, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/7909.jpg', badges: ['Seam Pro', 'Lethal'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Ravindra Jadeja', basePrice: 12.0, ovr: 89, position: 'All-Rounder', image: 'https://www.cricbuzz.com/stats/img/face/587.jpg', badges: ['Rocket Arm', 'Maverick'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Rishabh Pant', basePrice: 12.0, ovr: 88, position: 'WK-Batter', image: 'https://www.cricbuzz.com/stats/img/face/10744.jpg', badges: ['Instinctive', 'Fearless'], stats: [{ label: 'VAL', value: 88 }] },
+    { name: 'Sam Curran', basePrice: 10.0, ovr: 87, position: 'All-Rounder', image: 'https://www.cricbuzz.com/stats/img/face/12224.jpg', badges: ['Pocket Dynamo', 'Utility'], stats: [{ label: 'VAL', value: 87 }] },
+    { name: 'Trent Boult', basePrice: 12.0, ovr: 89, position: 'Bowler', image: 'https://www.cricbuzz.com/stats/img/face/8117.jpg', badges: ['Swinger', 'Strike'], stats: [{ label: 'VAL', value: 89 }] }
 ];
+
 const FOOTBALL_PLAYERS = [
-    { name: 'Lionel Messi',      basePrice: 20.0, ovr: 91, position: 'RW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/messi_psg.png', badges: ['GOAT', 'Playmaker'], stats: [{ label: 'VAL', value: 91 }] },
+    { name: 'Lionel Messi', basePrice: 20.0, ovr: 91, position: 'RW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/messi_psg.png', badges: ['GOAT', 'Playmaker'], stats: [{ label: 'VAL', value: 91 }] },
     { name: 'Cristiano Ronaldo', basePrice: 18.0, ovr: 90, position: 'ST', image: 'https://b.fssta.com/wp-content/uploads/2022/12/ronaldo_portugal.png', badges: ['Striker', 'Leader'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Kylian Mbappe',     basePrice: 25.0, ovr: 91, position: 'ST', image: 'https://b.fssta.com/wp-content/uploads/2022/12/mbappe_france.png', badges: ['Speedster', 'Clinical'], stats: [{ label: 'VAL', value: 91 }] },
-    { name: 'Kevin De Bruyne',   basePrice: 15.0, ovr: 91, position: 'CM', image: 'https://b.fssta.com/wp-content/uploads/2022/12/de-bruyne_belgium.png', badges: ['Architect', 'Vision'], stats: [{ label: 'VAL', value: 91 }] },
-    { name: 'Neymar Jr',         basePrice: 14.0, ovr: 89, position: 'LW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/neymar_brazil.png', badges: ['Magician', 'Dribbler'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Mo Salah',          basePrice: 15.0, ovr: 89, position: 'RW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/salah_egypt.png', badges: ['Egyptian King', 'Winger'], stats: [{ label: 'VAL', value: 89 }] },
-    { name: 'Harry Kane',        basePrice: 16.0, ovr: 90, position: 'ST', image: 'https://b.fssta.com/wp-content/uploads/2022/12/kane_england.png', badges: ['Prolific', 'Finisher'], stats: [{ label: 'VAL', value: 90 }] },
-    { name: 'Luka Modric',       basePrice: 10.0, ovr: 88, position: 'CM', image: 'https://b.fssta.com/wp-content/uploads/2022/12/modric_croatia.png', badges: ['Eternal', 'Maestro'], stats: [{ label: 'VAL', value: 88 }] }
+    { name: 'Kylian Mbappe', basePrice: 25.0, ovr: 91, position: 'ST', image: 'https://b.fssta.com/wp-content/uploads/2022/12/mbappe_france.png', badges: ['Speedster', 'Clinical'], stats: [{ label: 'VAL', value: 91 }] },
+    { name: 'Kevin De Bruyne', basePrice: 15.0, ovr: 91, position: 'CM', image: 'https://b.fssta.com/wp-content/uploads/2022/12/de-bruyne_belgium.png', badges: ['Architect', 'Vision'], stats: [{ label: 'VAL', value: 91 }] },
+    { name: 'Neymar Jr', basePrice: 14.0, ovr: 89, position: 'LW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/neymar_brazil.png', badges: ['Magician', 'Dribbler'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Mo Salah', basePrice: 15.0, ovr: 89, position: 'RW', image: 'https://b.fssta.com/wp-content/uploads/2022/12/salah_egypt.png', badges: ['Egyptian King', 'Winger'], stats: [{ label: 'VAL', value: 89 }] },
+    { name: 'Harry Kane', basePrice: 16.0, ovr: 90, position: 'ST', image: 'https://b.fssta.com/wp-content/uploads/2022/12/kane_england.png', badges: ['Prolific', 'Finisher'], stats: [{ label: 'VAL', value: 90 }] },
+    { name: 'Luka Modric', basePrice: 10.0, ovr: 88, position: 'CM', image: 'https://b.fssta.com/wp-content/uploads/2022/12/modric_croatia.png', badges: ['Eternal', 'Maestro'], stats: [{ label: 'VAL', value: 88 }] }
 ];
 
 // ─── Helpers ───────────────────────────────────────────────
@@ -176,9 +204,9 @@ function processPlayerSale(roomId) {
     room.holdSaleWarned = false;
 
     const bidder = room.currentBid.bidder;
-    const amount  = room.currentBid.amount;
+    const amount = room.currentBid.amount;
     const player = room.players && room.players[room.currentPlayerIndex];
-    
+
     if (!player) {
         room.status = 'finished';
         room.timerStarted = false;
@@ -205,7 +233,7 @@ function processPlayerSale(roomId) {
     room.bids = [];
     room.timerStarted = false; // Timer starts only on first bid
     room.currentPlayerIndex++;
-    
+
     if (room.currentPlayerIndex < (room.players?.length || 0)) {
         const next = room.players[room.currentPlayerIndex];
         room.currentBid = { amount: next.basePrice, bidder: null };
@@ -215,7 +243,7 @@ function processPlayerSale(roomId) {
         room.timeLeft = 0;
         addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION FINISHED' });
     }
-    
+
     markDirty(roomId);
     io.to(roomId).emit('room-update', getCompactRoom(room));
 }
@@ -257,11 +285,11 @@ setInterval(() => {
 setInterval(() => {
     rooms.forEach((room, roomId) => {
         if (room.status !== 'active') return;
-        
+
         // Timer only runs if explicitly started (by first bid) and no holds
         const hasHolds = room.holds && room.holds.length > 0;
         const canTick = room.timerStarted && !hasHolds;
-        
+
         if (canTick) {
             if (room.timeLeft > 0) {
                 room.timeLeft--;
@@ -298,7 +326,7 @@ function getHeuristicAnalysis(teams, format = 'T20') {
 
         let tacticalScore = 50 + (Math.min(players.length, 11) * 4);
         if (roles.batter >= 5 && roles.bowler >= 4) tacticalScore += 10;
-        
+
         return {
             teamName: name,
             strengths: [
@@ -310,10 +338,10 @@ function getHeuristicAnalysis(teams, format = 'T20') {
                 players.length < 9 ? "Incomplete Squad Balance" : "Niche Bench Gaps"
             ],
             tacticalMetrics: {
-                "Attack": Math.min(100, (roles.batter || 0) * 15 + 30),
-                "Defense": Math.min(100, (roles.bowler || 0) * 15 + 20),
-                "Versatility": Math.min(100, ((roles['all-rounder'] || 0) * 20) + 40),
-                "Clutch": tacticalScore - 10
+                "Batting": Math.min(100, (roles.batter || 0) * 15 + 30),
+                "Bowling": Math.min(100, (roles.bowler || 0) * 15 + 20),
+                "MatchWinners": Math.min(10, starPlayers.length + Math.floor(players.length / 4)),
+                "Balance": Math.min(100, tacticalScore)
             },
             totalInvested: players.reduce((sum, p) => sum + (p.boughtPrice || 0), 0),
             teamScore: Math.min(100, tacticalScore),
@@ -322,7 +350,7 @@ function getHeuristicAnalysis(teams, format = 'T20') {
         };
     });
 
-    const sortedByScore = [...teamAnalyses].sort((a,b) => b.teamScore - a.teamScore);
+    const sortedByScore = [...teamAnalyses].sort((a, b) => b.teamScore - a.teamScore);
     const winnerData = sortedByScore[0];
     const teamNames = Object.keys(teams);
 
@@ -357,10 +385,11 @@ app.post('/api/compare-teams', async (req, res) => {
     }
 
     try {
-        if (!genAI) throw new Error('AI not configured');
+        if (!genAI) throw new Error('AI not configured - Check GEMINI_API_KEY in .env');
 
-        // Primary: 2.5-flash (Modern Standard for 2026)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        // Update to gemini-1.5-flash-latest (Recommended Stable Alias)
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        console.log(process.env.GEMINI_API_KEY);
 
         const teamsDesc = Object.entries(teams).map(([name, data]) => {
             const playerList = (data.players || []).map((p, i) =>
@@ -369,21 +398,24 @@ app.post('/api/compare-teams', async (req, res) => {
             return `Team: ${name}\nRemaining Budget: ₹${(data.budget || 0).toFixed(2)}Cr\nPlayers:\n${playerList}`;
         }).join('\n\n---\n\n');
 
-        const prompt = `You are a world-class ${format || 'cricket'} strategy consultant. 
+        const prompt = `You are a world-class ${format || 'cricket'} strategy consultant and professional scout. 
 Analyze these auction teams for the ${format || 'Standard'} format. 
 
 CRITICAL INSTRUCTIONS:
 1. IGNORE the 'OVR' (Rating) numbers and the 'Remaining Budget' (Purse). They are purely administrative.
-2. Evaluate based on real-world player NAMES, their known skillsets, and how they complement each other.
-3. Determine which team has built the best squad for the ${format} format based on tactical balance.
+2. Evaluate based on real-world player NAMES, their known performance, and how they complement each other.
+3. Your analysis must be extremely accurate, reflecting actual player reputations and historical data.
 
 Teams Data:
 ${teamsDesc}
 
-Your analysis must explain:
-1. Why the selected winner is DOMINATING based on player names and reputations.
-2. The tactical philosophy of each team (Aggressive, Balanced, or Defensive).
-3. The specific "X-Factor" player for each team.
+Structure your response to include:
+1. BATTING COMPARISON: Compare the top-order and middle-order of each team.
+2. BOWLING COMPARISON: Compare the pace and spin attacks.
+3. ALL-ROUNDERS & UTILITY: Compare the balance provided by multi-talented players.
+4. MATCH WINNERS: Count the number of players who can single-handedly win a match.
+5. FLAWS & WEAKNESSES: Identify specific tactical holes in each roster.
+6. FINAL VERDICT: A calculated prediction of who wins and why.
 
 Provide a structured analysis in the following JSON format ONLY:
 {
@@ -391,32 +423,45 @@ Provide a structured analysis in the following JSON format ONLY:
     {
       "teamName": "string",
       "strengths": ["string"],
-      "weaknesses": ["string"],
+      "weaknesses": ["string (THE FLAWS)"],
       "totalInvested": number,
       "teamScore": number (1-100),
       "tacticalMetrics": {
-        "Attack": number (0-100),
-        "Defense": number (0-100),
-        "Versatility": number (0-100),
-        "Clutch": number (0-100)
+        "Batting": number (0-100),
+        "Bowling": number (0-100),
+        "MatchWinners": number (0-10),
+        "Balance": number (0-100)
       },
       "keyPlayers": ["string"],
-      "verdict": "Detailed 2-3 sentence analysis of their strategy"
+      "verdict": "Detailed analysis of their strategy"
     }
   ],
   "comparisonTable": {
-    "headers": ["Technical Attribute", "Team A", "Team B", "..."],
+    "headers": ["Department", "Team A", "Team B", "..."],
     "rows": [
-      ["Explosive Power", "Elite", "Strong", "Moderate"],
-      ["High-Pressure Resilience", "Surgical", "Balanced", "Lacking"]
+      ["Batting Unit", "Deep/Explosive", "Stable/Technical", "..."],
+      ["Bowling Attack", "Elite Pace", "Spin Heavy", "..."],
+      ["All-Rounder Depth", "High", "Low", "..."],
+      ["Match Winner Count", "4 Players", "2 Players", "..."]
     ]
   },
-  "headToHead": [
-    { "category": "string", "winner": "string", "reasoning": "Detailed technical reasoning" }
+  "playerComparisons": [
+    {
+      "position": "Batting Core",
+      "bestPlayer": "string",
+      "players": [{ "teamName": "string", "playerName": "string", "rating": "string (e.g. World Class)", "note": "Brief scout note" }]
+    },
+    {
+      "position": "Bowling Core",
+      "bestPlayer": "string",
+      "players": [{ "teamName": "string", "playerName": "string", "rating": "string", "note": "Brief scout note" }]
+    }
   ],
-  "winner": "string (the team with the best roster)",
-  "winnerReasoning": "A deep, 4-6 sentence masterclass on why this team's players make them the favorite and how they dominated the draft.",
-  "closestRival": "string",
+  "headToHead": [
+    { "category": "Top Order vs New Ball", "winner": "string", "reasoning": "Detailed technical reasoning" }
+  ],
+  "winner": "string",
+  "winnerReasoning": "A deep, 4-6 sentence masterclass on why this team wins, focusing on their departmental superiority.",
   "keyMatchup": "An interesting tactical matchup between two key players or teams"
 }`;
 
@@ -430,9 +475,9 @@ Provide a structured analysis in the following JSON format ONLY:
         const analysis = JSON.parse(jsonMatch[0]);
         res.json({ ...analysis, source: 'Gemini AI Analysis' });
     } catch (err) {
-        console.warn('⚠️ AI API failed or limited, switching to Heuristic Engine:', err.message);
+        console.error('❌ AI API Failed:', err.message);
         const fallbackResult = getHeuristicAnalysis(teams, format);
-        res.json(fallbackResult);
+        res.json({ ...fallbackResult, error: err.message, source: 'Heuristic Engine (AI Unavailable)' });
     }
 });
 
@@ -446,29 +491,29 @@ io.on('connection', (socket) => {
 
         const newRoomState = {
             adminSocket: socket.id,
-            adminTeam:   teamName,
-            status:      'waiting',
-            bids:        [],
-            players:     [...CRICKET_PLAYERS],
+            adminTeam: teamName,
+            status: 'waiting',
+            bids: [],
+            players: [...CRICKET_PLAYERS],
             currentPlayerIndex: 0,
-            currentBid:  { amount: 0, bidder: null },
-            budgets:     { [teamName]: 100 },
-            squads:      { [teamName]: [] },
+            currentBid: { amount: 0, bidder: null },
+            budgets: { [teamName]: 100 },
+            squads: { [teamName]: [] },
             teamSocketMap: { [teamName]: socket.id },
-            userToTeam:  { [uname]: teamName },
-            holds:       [],
+            userToTeam: { [uname]: teamName },
+            holds: [],
             holdSaleWarned: false,
             globalSettings: { initialBudget: 100, allowedIncrements: [0.25, 0.5, 1, 2, 5] },
-            timeLeft:    AUCTION_TIMER_SECONDS,
-            messages:    [],
-            activity:    [{ type: 'SYSTEM', message: 'The Arena is Open!', id: Date.now() }],
-            createdAt:   Date.now()
+            timeLeft: AUCTION_TIMER_SECONDS,
+            messages: [],
+            activity: [{ type: 'SYSTEM', message: 'The Arena is Open!', id: Date.now() }],
+            createdAt: Date.now()
         };
 
         rooms.set(id, newRoomState);
         socket.join(id);
         markDirty(id);
-        
+
         // Immediate sync for creator
         socket.emit('admin-status', true);
         socket.emit('room-created', { roomId: id, state: newRoomState, isAdmin: true });
@@ -495,7 +540,7 @@ io.on('connection', (socket) => {
         const uname = username || teamName;
         // Rejoin detection (checks both modern and legacy mappings)
         let existingTeam = room.userToTeam[uname];
-        
+
         // Legacy fallback for rooms created with older versions
         if (!existingTeam && room.usernameMap?.[uname]) {
             // Find team from old teamNames via old socketId
@@ -521,7 +566,7 @@ io.on('connection', (socket) => {
             }
             room.userToTeam[uname] = teamName;
             room.teamSocketMap[teamName] = socket.id;
-            
+
             // Critical: If creator is joining but wasn't in userToTeam, restore admin
             if (room.adminTeam === teamName) room.adminSocket = socket.id;
 
@@ -530,7 +575,7 @@ io.on('connection', (socket) => {
 
         const isAdmin = room.adminSocket === socket.id;
         markDirty(roomId);
-        
+
         // Full Real-time Sync: Everyone in the room (including joiner) gets the same updated state
         socket.emit('admin-status', isAdmin);
         socket.emit('room-joined', { roomId, state: room, isAdmin, isRejoin });
@@ -541,16 +586,16 @@ io.on('connection', (socket) => {
     socket.on('set-team-name', ({ roomId, teamName, username }) => {
         const room = rooms.get(roomId);
         if (!room) return;
-        
+
         const uname = username || teamName;
         if (!room.userToTeam) room.userToTeam = {};
         if (!room.teamSocketMap) room.teamSocketMap = {};
-        
+
         room.userToTeam[uname] = teamName;
         room.teamSocketMap[teamName] = socket.id;
 
         if (room.adminTeam === teamName) room.adminSocket = socket.id;
-        
+
         markDirty(roomId);
         io.to(roomId).emit('room-update', getCompactRoom(room));
     });
@@ -618,13 +663,13 @@ io.on('connection', (socket) => {
         if (!room || room.adminSocket !== socket.id || !player.name || !player.basePrice) return;
 
         const newPlayer = {
-            name:      player.name,
+            name: player.name,
             basePrice: parseFloat(player.basePrice) || 1,
-            ovr:       parseInt(player.ovr) || 80,
-            position:  player.position || 'N/A',
-            image:     player.image || null,
-            badges:    player.badges || ['Manual Entry'],
-            stats:     player.stats || [{ label: 'VAL', value: parseInt(player.ovr) || 80 }]
+            ovr: parseInt(player.ovr) || 80,
+            position: player.position || 'N/A',
+            image: player.image || null,
+            badges: player.badges || ['Manual Entry'],
+            stats: player.stats || [{ label: 'VAL', value: parseInt(player.ovr) || 80 }]
         };
         room.players.push(newPlayer);
 
@@ -637,6 +682,51 @@ io.on('connection', (socket) => {
         }
         markDirty(roomId);
         io.to(roomId).emit('room-update', room); // FULL Update for lobby
+    });
+
+    // ── Update Marketplace Player ────────────────────────
+    socket.on('admin-update-marketplace-player', ({ roomId, playerIndex, updatedData }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.adminSocket !== socket.id) return;
+        const idx = parseInt(playerIndex);
+        if (isNaN(idx) || idx < 0 || idx >= (room.players?.length || 0)) return;
+
+        const player = room.players[idx];
+        const oldName = player.name;
+
+        // Update marketplace entry
+        room.players[idx] = { ...player, ...updatedData };
+
+        // Synchronize with squads if player is already sold
+        Object.keys(room.squads || {}).forEach(tName => {
+            room.squads[tName] = (room.squads[tName] || []).map(sp => {
+                if (sp.name === oldName) {
+                    const oldPrice = sp.boughtPrice || 0;
+                    const newPrice = updatedData.basePrice !== undefined ? (parseFloat(updatedData.basePrice) || 0) : oldPrice;
+
+                    // Adjust budget if price changed
+                    if (newPrice !== oldPrice) {
+                        room.budgets[tName] = (room.budgets[tName] || 0) + (oldPrice - newPrice);
+                    }
+
+                    return { ...sp, ...updatedData, boughtPrice: newPrice };
+                }
+                return sp;
+            });
+        });
+
+        addActivity(roomId, { type: 'SYSTEM', message: `ADMIN UPDATED ${player.name} GLOBALLY` });
+
+        // Synchronize current bid if this player is currently under auction and no bids placed yet
+        if (idx === room.currentPlayerIndex && room.currentBid.bidder === null) {
+            if (updatedData.basePrice !== undefined) {
+                room.currentBid.amount = parseFloat(updatedData.basePrice);
+                room.timeLeft = AUCTION_TIMER_SECONDS || 60; // Refresh timer on edit
+            }
+        }
+
+        markDirty(roomId);
+        io.to(roomId).emit('room-update', { ...room });
     });
 
     // ── Remove Player (Marketplace) ───────────────────────
@@ -658,18 +748,30 @@ io.on('connection', (socket) => {
         if (!squad || !squad[playerIndex]) return;
 
         const player = squad[playerIndex];
+        const oldName = player.name;
         const oldPrice = player.boughtPrice || 0;
         const newPrice = parseFloat(updatedData.boughtPrice);
 
-        // Update basic info
+        // Update squad info
         squad[playerIndex] = { ...player, ...updatedData, boughtPrice: !isNaN(newPrice) ? newPrice : oldPrice };
 
-        // If price changed, adjust budget
+        // Adjust budget
         if (!isNaN(newPrice) && newPrice !== oldPrice) {
             room.budgets[teamName] += (oldPrice - newPrice);
         }
 
-        addActivity(roomId, { type: 'SYSTEM', message: `ADMIN UPDATED ${player.name} IN ${teamName.toUpperCase()}` });
+        // Synchronize with marketplace
+        const mIdx = room.players.findIndex(p => p.name === oldName);
+        if (mIdx !== -1) {
+            const mPlayer = room.players[mIdx];
+            room.players[mIdx] = {
+                ...mPlayer,
+                ...updatedData,
+                basePrice: !isNaN(newPrice) ? newPrice : mPlayer.basePrice
+            };
+        }
+
+        addActivity(roomId, { type: 'SYSTEM', message: `ADMIN UPDATED ${player.name} GLOBALLY` });
         markDirty(roomId);
         io.to(roomId).emit('room-update', room);
     });
@@ -710,6 +812,26 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('room-update', room);
     });
 
+    socket.on('admin-add-to-squad', ({ roomId, teamName, playerData }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.adminSocket !== socket.id) return;
+        if (!room.squads[teamName]) room.squads[teamName] = [];
+
+        const price = parseFloat(playerData.boughtPrice || 0);
+        room.squads[teamName].push({
+            ...playerData,
+            boughtPrice: price,
+            ovr: parseInt(playerData.ovr || 80),
+            position: playerData.position || 'N/A'
+        });
+
+        room.budgets[teamName] -= price;
+
+        addActivity(roomId, { type: 'SYSTEM', message: `ADMIN ADDED ${playerData.name} DIRECTLY TO ${teamName.toUpperCase()}` });
+        markDirty(roomId);
+        io.to(roomId).emit('room-update', room);
+    });
+
     // ── Bulk Update Players ────────────────────────────────
     socket.on('update-players', ({ roomId, players }) => {
         const room = rooms.get(roomId);
@@ -741,24 +863,24 @@ io.on('connection', (socket) => {
     socket.on('start-auction', (roomId) => {
         const room = rooms.get(roomId);
         if (!room || room.adminSocket !== socket.id) return;
-        
+
         // Safety: Ensure players exist
         if (!room.players || room.players.length === 0) {
             room.players = [...CRICKET_PLAYERS];
         }
-        
+
         room.status = 'active';
         room.currentPlayerIndex = 0;
         room.bids = [];
         room.timerStarted = false; // Wait for first bid
-        
+
         const cur = room.players[0];
         room.currentBid = { amount: cur?.basePrice || 0, bidder: null };
         room.timeLeft = AUCTION_TIMER_SECONDS || 60;
-        
+
         addActivity(roomId, { type: 'SYSTEM', message: 'AUCTION STARTED' });
         markDirty(roomId);
-        
+
         io.to(roomId).emit('auction-started', { roomId, state: room, currentPlayer: cur });
         io.to(roomId).emit('room-update', getCompactRoom(room));
     });
@@ -799,17 +921,24 @@ io.on('connection', (socket) => {
     // ── Place Bid ──────────────────────────────────────────
     socket.on('place-bid', ({ roomId, amount, bidder }) => {
         const room = rooms.get(roomId);
-        if (!room || room.status !== 'active') return;
+        if (!room) return;
+        if (room.status !== 'active') {
+            console.log(`[BID REJECTED] Team ${bidder} tried to bid on ${roomId} but it is ${room.status}`);
+            return;
+        }
         if (isRateLimited(socket.id)) return; // rate limit
 
+        const bidAmount = parseFloat(amount) || 0;
         const currentAmount = room.currentBid.amount;
         const isFirstBid = room.currentBid.bidder === null;
-        const isValid = isFirstBid ? amount >= currentAmount : amount > currentAmount;
-        const hasBudget = (room.budgets[bidder] || 0) >= amount;
+        const isValid = isFirstBid ? bidAmount >= currentAmount : bidAmount > currentAmount;
+        const budget = room.budgets[bidder] || 0;
+        const hasBudget = budget >= bidAmount;
 
         if (isValid && hasBudget) {
-            room.currentBid = { amount, bidder };
-            room.bids.push({ amount, bidder, time: new Date() });
+            const finalAmount = bidAmount;
+            room.currentBid = { amount: finalAmount, bidder };
+            room.bids.push({ amount: finalAmount, bidder, time: new Date() });
             room.timeLeft = AUCTION_TIMER_SECONDS || 60;
             room.timerStarted = true; // --- START THE TIMER ON FIRST BID ---
 
@@ -822,6 +951,8 @@ io.on('connection', (socket) => {
             if (room.bids.length > 50) room.bids = room.bids.slice(-50); // Hard cap history
             markDirty(roomId);
             io.to(roomId).emit('new-bid', { currentBid: room.currentBid, timeLeft: room.timeLeft, bids: recentBids });
+        } else {
+            console.log(`[BID REJECTED] from ${bidder}: amount=${bidAmount}, current=${currentAmount}, budget=${budget}, isValid=${isValid}, hasBudget=${hasBudget}`);
         }
     });
 
@@ -835,7 +966,7 @@ io.on('connection', (socket) => {
             room.currentBid = prev
                 ? { amount: prev.amount, bidder: prev.bidder }
                 : { amount: room.players[room.currentPlayerIndex]?.basePrice || 0, bidder: null };
-            room.timerStarted = !!prev; 
+            room.timerStarted = !!prev;
             markDirty(roomId);
             io.to(roomId).emit('room-update', getCompactRoom(room));
         }
@@ -865,11 +996,11 @@ io.on('connection', (socket) => {
     socket.on('send-message', ({ roomId, message, user, teamName }) => {
         if (!message?.trim()) return;
         const msg = {
-            id:       `${Date.now()}-${socket.id}`,
-            user:     user || 'Unknown',
+            id: `${Date.now()}-${socket.id}`,
+            user: user || 'Unknown',
             teamName: teamName || '',
-            content:  message.trim().slice(0, 500), // cap at 500 chars
-            time:     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            content: message.trim().slice(0, 500), // cap at 500 chars
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         // Store last 100 messages per room
         const room = rooms.get(roomId);
@@ -886,7 +1017,7 @@ io.on('connection', (socket) => {
     socket.on('kick-team', ({ roomId, teamName }) => {
         const room = rooms.get(roomId);
         if (!room || room.adminSocket !== socket.id) return;
-        
+
         const targetSocketId = room.teamSocketMap?.[teamName];
         if (targetSocketId) {
             io.to(targetSocketId).emit('kicked', { message: 'You have been removed from this room.' });
@@ -899,7 +1030,7 @@ io.on('connection', (socket) => {
                 if (room.userToTeam[u] === teamName) delete room.userToTeam[u];
             });
         }
-        
+
         addActivity(roomId, { type: 'SYSTEM', message: `${teamName.toUpperCase()} WAS REMOVED FROM ARENA` });
         markDirty(roomId);
         io.to(roomId).emit('room-update', getCompactRoom(room));
@@ -909,7 +1040,7 @@ io.on('connection', (socket) => {
     socket.on('transfer-admin', ({ roomId, teamName }) => {
         const room = rooms.get(roomId);
         if (!room || room.adminSocket !== socket.id) return;
-        
+
         const targetSocketId = room.teamSocketMap?.[teamName];
         if (targetSocketId) {
             room.adminTeam = teamName;
